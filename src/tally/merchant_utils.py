@@ -511,7 +511,7 @@ BASELINE_RULES = [
     (r'APPLE STORE|APPLE\.COM(?!/BILL)', 'Apple Store', 'Shopping', 'Electronics'),
     (r'BEST BUY(?!\.COM)', 'Best Buy', 'Shopping', 'Electronics'),
     ('MICRO CENTER', 'Micro Center', 'Shopping', 'Electronics'),
-    (r'B.*H PHOTO', 'B&H Photo', 'Shopping', 'Electronics'),
+    (r'B\s*&?\s*H PHOTO|B&H PHOTO', 'B&H Photo', 'Shopping', 'Electronics'),
     ('GAMESTOP', 'GameStop', 'Shopping', 'Electronics'),
     ('STAPLES', 'Staples', 'Shopping', 'Office'),
     (r'OFFICE DEPOT|OFFICEMAX', 'Office Depot', 'Shopping', 'Office'),
@@ -606,7 +606,7 @@ BASELINE_RULES = [
     ('SPOTIFY', 'Spotify', 'Subscriptions', 'Streaming'),
     (r'DISNEY.*PLUS|DISNEYPLUS', 'Disney+', 'Subscriptions', 'Streaming'),
     ('HULU', 'Hulu', 'Subscriptions', 'Streaming'),
-    (r'HBO.*MAX|MAX\s', 'Max', 'Subscriptions', 'Streaming'),
+    (r'HBO\s*MAX|^MAX\s|MAX\.COM', 'Max', 'Subscriptions', 'Streaming'),
     (r'YOUTUBE|GOOGLE\*YOUTUBE', 'YouTube Premium', 'Subscriptions', 'Streaming'),
     (r'APPLE\.COM/BILL|ITUNES', 'Apple Services', 'Subscriptions', 'Streaming'),
     (r'AMAZON.*PRIME|PRIME VIDEO', 'Amazon Prime', 'Subscriptions', 'Streaming'),
@@ -715,7 +715,7 @@ BASELINE_RULES = [
     (r'IRS\s|USATAXPYMT|US TREASURY', 'IRS', 'Bills', 'Tax'),
     (r'STATE TAX|DOR\s', 'State Tax', 'Bills', 'Tax'),
     (r'PROPERTY TAX|COUNTY TAX', 'Property Tax', 'Bills', 'Tax'),
-    (r'H.*R BLOCK|HRBLOCK', 'H&R Block', 'Bills', 'Tax Prep'),
+    (r'H\s*&\s*R BLOCK|HRBLOCK', 'H&R Block', 'Bills', 'Tax Prep'),
     (r'TURBOTAX|INTUIT.*TAX', 'TurboTax', 'Bills', 'Tax Prep'),
     ('JACKSON HEWITT', 'Jackson Hewitt', 'Bills', 'Tax Prep'),
 
@@ -835,7 +835,7 @@ BASELINE_RULES = [
     # AUTO PARTS
     # -------------------------------------------------------------------------
     ('AUTOZONE', 'AutoZone', 'Transport', 'Auto Parts'),
-    (r"O.*REILLY AUTO", "O'Reilly Auto", 'Transport', 'Auto Parts'),
+    (r"O'?REILLY AUTO|OREILLY AUTO", "O'Reilly Auto", 'Transport', 'Auto Parts'),
     (r'NAPA\s|NAPA AUTO', 'NAPA Auto Parts', 'Transport', 'Auto Parts'),
     ('ADVANCE AUTO', 'Advance Auto Parts', 'Transport', 'Auto Parts'),
     ('PEPBOYS', 'Pep Boys', 'Transport', 'Auto Parts'),
