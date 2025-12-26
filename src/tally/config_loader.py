@@ -136,7 +136,7 @@ def resolve_source_format(source):
     else:
         raise ValueError(
             f"Data source '{source.get('name', 'unknown')}' must specify "
-            "'type' or 'format'. Use 'budget-analyze inspect <file>' to determine the format."
+            "'type' or 'format'. Use 'tally inspect <file>' to determine the format."
         )
 
     return source

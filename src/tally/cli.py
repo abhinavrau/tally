@@ -1,11 +1,11 @@
 """
-Budget Analyzer CLI - Command-line interface.
+Tally CLI - Command-line interface.
 
 Usage:
-    budget-analyze /path/to/config/dir               # Analyze using config directory
-    budget-analyze /path/to/config/dir --summary     # Summary only (no HTML)
-    budget-analyze /path/to/config/dir --settings settings-2024.yaml
-    budget-analyze --help-config                     # Show detailed config documentation
+    tally /path/to/config/dir               # Analyze using config directory
+    tally /path/to/config/dir --summary     # Summary only (no HTML)
+    tally /path/to/config/dir --settings settings-2024.yaml
+    tally --help-config                     # Show detailed config documentation
 """
 
 import argparse
@@ -31,10 +31,10 @@ BUDGET ANALYZER - CONFIGURATION
 
 QUICK START
 -----------
-1. Run: budget-analyze init ./my-budget
+1. Run: tally init ./my-budget
 2. Add CSV/TXT statements to my-budget/data/
 3. Edit my-budget/config/settings.yaml with your data sources
-4. Run: budget-analyze run ./my-budget/config
+4. Run: tally run ./my-budget/config
 
 DIRECTORY STRUCTURE
 -------------------
@@ -79,9 +79,9 @@ Domestic out-of-state is NOT auto-travel. To opt-in, add merchant rules:
 DISCOVERING UNKNOWN MERCHANTS
 -----------------------------
 Use the discover command to find uncategorized transactions:
-  budget-analyze discover               # Human-readable output
-  budget-analyze discover --format csv  # CSV output to copy-paste
-  budget-analyze discover --format json # JSON for programmatic use
+  tally discover               # Human-readable output
+  tally discover --format csv  # CSV output to copy-paste
+  tally discover --format json # JSON for programmatic use
 
 CUSTOM MERCHANT RULES
 ---------------------
@@ -97,10 +97,10 @@ Pattern syntax (Python regex):
   COSTCO(?!.*GAS)   COSTCO but not COSTCO GAS
   ^ATT\\s           Starts with "ATT "
 
-Use: budget-analyze inspect <file.csv> to see transaction formats.
+Use: tally inspect <file.csv> to see transaction formats.
 '''
 
-STARTER_SETTINGS = '''# Budget Analyzer Settings
+STARTER_SETTINGS = '''# Tally Settings
 year: {year}
 title: "Spending Analysis {year}"
 
@@ -142,7 +142,7 @@ STARTER_MERCHANT_CATEGORIES = '''# Custom Merchant Categorization Rules
 # - Test patterns at regex101.com (Python flavor)
 #
 # First match wins - your rules are checked before built-in rules.
-# Run: budget-analyze inspect <file> to see your transaction descriptions.
+# Run: tally inspect <file> to see your transaction descriptions.
 #
 # Examples:
 #   MY LOCAL BAKERY,My Favorite Bakery,Food,Restaurant
@@ -155,42 +155,42 @@ Pattern,Merchant,Category,Subcategory
 
 '''
 
-STARTER_AGENTS_MD = '''# Budget Analyzer - Agent Instructions
+STARTER_AGENTS_MD = '''# Tally - Agent Instructions
 
-This document provides instructions for AI agents working with Budget Analyzer.
+This document provides instructions for AI agents working with Tally.
 
 ## Quick Reference
 
 ```bash
 # Show help
-budget-analyze
+tally
 
 # Initialize a new budget directory (current dir or specified)
-budget-analyze init
-budget-analyze init ./my-budget
+tally init
+tally init ./my-budget
 
 # Run analysis (uses ./config by default)
-budget-analyze run
-budget-analyze run ./path/to/config
+tally run
+tally run ./path/to/config
 
 # View summary only (find uncategorized transactions)
-budget-analyze run --summary
+tally run --summary
 
 # Inspect a CSV file to see its structure and get format suggestions
-budget-analyze inspect path/to/file.csv
+tally inspect path/to/file.csv
 
 # Discover unknown merchants and get suggested rules
-budget-analyze discover                    # Human-readable output
-budget-analyze discover --format csv       # CSV output for import
-budget-analyze discover --format json      # JSON output for programmatic use
-budget-analyze discover --limit 50         # Show top 50 by spend
+tally discover                    # Human-readable output
+tally discover --format csv       # CSV output for import
+tally discover --format json      # JSON output for programmatic use
+tally discover --limit 50         # Show top 50 by spend
 ```
 
 ## Your Tasks
 
 When working with this budget analyzer, you may be asked to:
 
-1. **Set up a new budget directory** - Use `budget-analyze init`
+1. **Set up a new budget directory** - Use `tally init`
 2. **Add merchant categorization rules** - Edit `config/merchant_categories.csv`
 3. **Configure data sources** - Edit `config/settings.yaml`
 4. **Analyze and fix uncategorized transactions** - Run with `--summary`, then add rules
@@ -264,7 +264,7 @@ Use these categories for consistency:
 
 1. Run discover to find unknown merchants sorted by spend:
    ```bash
-   budget-analyze discover --format json
+   tally discover --format json
    ```
 
 2. The output includes:
@@ -281,14 +281,14 @@ Use these categories for consistency:
 
 4. Re-run to verify:
    ```bash
-   budget-analyze run --summary
+   tally run --summary
    ```
 
 ### Method 2: Manual inspection
 
 1. Run analysis to find unknown merchants:
    ```bash
-   budget-analyze run --summary
+   tally run --summary
    ```
 
 2. Look for transactions categorized as "Unknown"
@@ -306,10 +306,10 @@ The discover command is designed to help agents efficiently create rules:
 
 ```bash
 # Get JSON output for programmatic processing
-budget-analyze discover --format json --limit 0
+tally discover --format json --limit 0
 
 # Get CSV output ready for import (just needs categories filled in)
-budget-analyze discover --format csv
+tally discover --format csv
 ```
 
 ### JSON Output Structure
@@ -331,14 +331,14 @@ budget-analyze discover --format csv
 
 ### Workflow for Agents
 
-1. Run `budget-analyze discover --format json --limit 0`
+1. Run `tally discover --format json --limit 0`
 2. Parse the JSON output
 3. For each unknown merchant:
    - Use `suggested_pattern` as starting point (may need refinement)
    - Use `suggested_merchant` as the merchant name
    - Determine Category/Subcategory based on merchant type
 4. Append rules to `config/merchant_categories.csv`
-5. Run `budget-analyze run --summary` to verify improvement
+5. Run `tally run --summary` to verify improvement
 6. Repeat until Unknown transactions are minimized
 
 ## File Locations
@@ -414,7 +414,7 @@ Position in the string = column index (0-based).
 
 Use the **inspect** command to analyze an unknown CSV:
 ```bash
-budget-analyze inspect path/to/file.csv
+tally inspect path/to/file.csv
 ```
 
 This shows column headers, indices, and sample data rows.
@@ -423,7 +423,7 @@ This shows column headers, indices, and sample data rows.
 
 **Step 1: Inspect the file**
 ```bash
-budget-analyze inspect data/newbank.csv
+tally inspect data/newbank.csv
 ```
 
 **Step 2: Identify the columns**
@@ -456,7 +456,7 @@ format: "{date:%m/%d/%Y}, {_}, {description}, {_}, {amount}"
 
 **Step 4: Add to settings.yaml and run**
 ```bash
-budget-analyze run
+tally run
 ```
 
 Transaction descriptions look like:
@@ -467,14 +467,14 @@ Transaction descriptions look like:
 
 ### Task: User wants to analyze their spending
 1. Ensure `config/settings.yaml` has correct data sources
-2. Run `budget-analyze run`
+2. Run `tally run`
 3. Open the HTML report in `output/`
 
 ### Task: User has many "Unknown" transactions
-1. Run `budget-analyze discover --format json` to get unknowns sorted by spend
+1. Run `tally discover --format json` to get unknowns sorted by spend
 2. For each unknown merchant, determine appropriate Category/Subcategory
 3. Add patterns to `merchant_categories.csv`
-4. Run `budget-analyze run --summary` to verify improvement
+4. Run `tally run --summary` to verify improvement
 5. Repeat until unknowns are minimized
 
 ### Task: User wants to track a specific merchant
@@ -491,7 +491,7 @@ COSTCO(?!\\s*GAS),Costco,Food,Grocery
 
 ## Tips
 
-- Run `budget-analyze` with no args to see help
+- Run `tally` with no args to see help
 - Test regex patterns at regex101.com (Python flavor)
 - Comments start with `#` in CSV files
 - Escape special regex chars: `\\.` for literal dot, `\\*` for literal asterisk
@@ -557,10 +557,10 @@ cp ../2025/config/merchant_categories.csv config/
 ### 5. Run analysis and iterate
 ```bash
 # Initial run - will have many "Unknown"
-budget-analyze run
+tally run
 
 # Check what's unknown
-budget-analyze run --summary --category Unknown
+tally run --summary --category Unknown
 
 # Extract unique unknown patterns for analysis
 python3 << 'EOF'
@@ -586,9 +586,9 @@ MICROSOFT DES:EDIPAYMENT,Microsoft Payroll,Income,Salary
 ### 7. Iterate until Unknown < 5%
 Re-run after each batch of patterns until categorization rate is acceptable:
 ```bash
-budget-analyze run  # Check Unknown total
+tally run  # Check Unknown total
 # Add more patterns
-budget-analyze run  # Verify improvement
+tally run  # Verify improvement
 ```
 
 ### Common Data Issues
@@ -617,31 +617,31 @@ This file provides context for Claude Code when working in this budget directory
 
 ## Project Overview
 
-This is a personal budget analysis directory using the `budget-analyze` CLI tool.
+This is a personal budget analysis directory using the `tally` CLI tool.
 The tool categorizes bank/credit card transactions and generates spending reports.
 
 ## Key Commands
 
 ```bash
 # Run analysis (uses ./config by default)
-budget-analyze run
+tally run
 
 # Show summary only (good for checking Unknown transactions)
-budget-analyze run --summary
+tally run --summary
 
 # Run with specific config directory
-budget-analyze run ./path/to/config
+tally run ./path/to/config
 
 # Initialize a new budget directory
-budget-analyze init
+tally init
 
 # Discover unknown merchants (KEY FOR CLASSIFICATION)
-budget-analyze discover                # Human-readable
-budget-analyze discover --format json  # For programmatic use
-budget-analyze discover --format csv   # Ready to copy into rules
+tally discover                # Human-readable
+tally discover --format json  # For programmatic use
+tally discover --format csv   # Ready to copy into rules
 
 # Inspect a CSV to determine its format
-budget-analyze inspect data/file.csv
+tally inspect data/file.csv
 ```
 
 ## Directory Structure
@@ -659,13 +659,13 @@ budget-analyze inspect data/file.csv
 
 When asked to improve categorization:
 
-1. Run `budget-analyze discover --format json` to find unknown merchants sorted by spend
+1. Run `tally discover --format json` to find unknown merchants sorted by spend
 2. For each unknown merchant:
    - Identify what the merchant is (restaurant, store, subscription, etc.)
    - Determine appropriate Category and Subcategory
    - Create a regex pattern that matches the transaction description
 3. Add rules to `config/merchant_categories.csv`
-4. Run `budget-analyze run --summary` to verify improvement
+4. Run `tally run --summary` to verify improvement
 5. Repeat until Unknown < 5% of total
 
 The `discover` command provides suggested patterns and merchant names to speed up this process.
@@ -735,7 +735,7 @@ data_sources:
 - `{location}` - Optional location column
 - `{_}` - Skip column
 
-Use `budget-analyze inspect <file>` to see the CSV structure before creating a format string.
+Use `tally inspect <file>` to see the CSV structure before creating a format string.
 
 See AGENTS.md for detailed examples of creating format strings.
 '''
@@ -780,7 +780,7 @@ def init_config(target_dir):
     gitignore_path = os.path.join(target_dir, '.gitignore')
     if not os.path.exists(gitignore_path):
         with open(gitignore_path, 'w', encoding='utf-8') as f:
-            f.write('''# Budget Analyzer - Ignore sensitive data
+            f.write('''# Tally - Ignore sensitive data
 data/
 output/
 ''')
@@ -799,11 +799,11 @@ Budget analysis for {current_year}.
 1. Export your bank/credit card statements to `data/`
 2. Update `config/settings.yaml` with your data sources
 3. Add custom merchant rules to `config/merchant_categories.csv`
-4. Run: `budget-analyze ./config`
+4. Run: `tally ./config`
 
 ## Documentation
 
-Run `budget-analyze --help-config` for detailed configuration guide.
+Run `tally --help-config` for detailed configuration guide.
 ''')
         files_created.append('README.md')
 
@@ -870,7 +870,7 @@ NEXT STEPS
    ```
 
 3. Run the analyzer:
-   budget-analyze run
+   tally run
 
 ================================================================================
 STATEMENT FILE FORMATS
@@ -914,7 +914,7 @@ Common Categories:
 
 Tips:
   - First match wins - put specific patterns before general ones
-  - Run 'budget-analyze run --summary' to find Unknown transactions
+  - Run 'tally run --summary' to find Unknown transactions
   - Test patterns at regex101.com (Python flavor)
   - Lines starting with # are comments
 
@@ -933,7 +933,7 @@ def cmd_run(args):
 
     if not os.path.isdir(config_dir):
         print(f"Error: Config directory not found: {config_dir}", file=sys.stderr)
-        print(f"\nRun 'budget-analyze init' to create a new budget directory.", file=sys.stderr)
+        print(f"\nRun 'tally init' to create a new budget directory.", file=sys.stderr)
         sys.exit(1)
 
     # Load configuration
@@ -948,7 +948,7 @@ def cmd_run(args):
     travel_labels = config.get('travel_labels', {})
 
     if not args.quiet:
-        print(f"Budget Analyzer - {year}")
+        print(f"Tally - {year}")
         print(f"Config: {config_dir}/{args.settings}")
         print()
 
@@ -1001,7 +1001,7 @@ def cmd_run(args):
             else:
                 if not args.quiet:
                     print(f"  {source['name']}: Unknown parser type '{parser_type}'")
-                    print(f"    Use 'budget-analyze inspect {source['file']}' to determine format")
+                    print(f"    Use 'tally inspect {source['file']}' to determine format")
                 continue
         except Exception as e:
             if not args.quiet:
@@ -1082,7 +1082,7 @@ def cmd_discover(args):
 
     if not os.path.isdir(config_dir):
         print(f"Error: Config directory not found: {config_dir}", file=sys.stderr)
-        print(f"\nRun 'budget-analyze init' to create a new budget directory.", file=sys.stderr)
+        print(f"\nRun 'tally init' to create a new budget directory.", file=sys.stderr)
         sys.exit(1)
 
     # Load configuration
@@ -1413,7 +1413,7 @@ def cmd_diag(args):
 
     if not os.path.isdir(config_dir):
         print("ERROR: Config directory not found!")
-        print("Run 'budget-analyze init' to create a new budget directory.")
+        print("Run 'tally init' to create a new budget directory.")
         sys.exit(1)
 
     # Settings file
@@ -1535,10 +1535,10 @@ def cmd_diag(args):
 
 
 def main():
-    """Main entry point for budget-analyze CLI."""
+    """Main entry point for tally CLI."""
     parser = argparse.ArgumentParser(
-        prog='budget-analyze',
-        description='Analyze credit card and bank statements with automatic merchant categorization.',
+        prog='tally',
+        description='Let AI classify your transactions - LLM-powered spending categorization.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Commands:
@@ -1549,16 +1549,16 @@ Commands:
   diag [config]    Show diagnostic info about config and rules
 
 Examples:
-  budget-analyze init                 Initialize in current directory
-  budget-analyze init ./my-budget     Initialize in specified directory
-  budget-analyze run                  Run analysis (uses ./config)
-  budget-analyze run ./my-budget/config   Run with specific config
-  budget-analyze run --summary        Show summary only, no HTML report
-  budget-analyze inspect data/bank.csv  Inspect CSV to determine format
-  budget-analyze discover             Find unknown merchants, suggest rules
-  budget-analyze discover --format json  JSON output for agents
-  budget-analyze diag                  Show diagnostic info about rules
-  budget-analyze diag --format json    JSON output for agents
+  tally init                 Initialize in current directory
+  tally init ./my-budget     Initialize in specified directory
+  tally run                  Run analysis (uses ./config)
+  tally run ./my-budget/config   Run with specific config
+  tally run --summary        Show summary only, no HTML report
+  tally inspect data/bank.csv  Inspect CSV to determine format
+  tally discover             Find unknown merchants, suggest rules
+  tally discover --format json  JSON output for agents
+  tally diag                  Show diagnostic info about rules
+  tally diag --format json    JSON output for agents
 '''
     )
 
