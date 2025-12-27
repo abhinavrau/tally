@@ -1763,7 +1763,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         merchant_id = merchant.replace("'", "").replace('"', '').replace(' ', '_')
         cat_data = f"{data.get('category', '')}/{data.get('subcategory', '')}".lower()
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td>{data['months_active']}</td>
                         <td>{data['count']}</td>
@@ -1776,7 +1776,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="7"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -1823,7 +1823,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         merchant_id = merchant.replace("'", "").replace('"', '').replace(' ', '_')
         cat_data = f"{data.get('category', '')}/{data.get('subcategory', '')}".lower()
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td class="category clickable" onclick="addFilterFromCell(event, this, 'category')">{data['subcategory']}</td>
                         <td>{data['count']}</td>
@@ -1834,7 +1834,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="5"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -1879,7 +1879,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         merchant_id = merchant.replace("'", "").replace('"', '').replace(' ', '_')
         cat_data = f"{data.get('category', '')}/{data.get('subcategory', '')}".lower()
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td class="category clickable" onclick="addFilterFromCell(event, this, 'category')">{data['subcategory']}</td>
                         <td>{data['count']}</td>
@@ -1890,7 +1890,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="5"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -1936,7 +1936,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         cat_data = f"{data.get('category', 'travel')}/{data.get('subcategory', '')}".lower()
         category_display = data.get('category', 'Travel')
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td class="clickable" onclick="addFilterFromCell(event, this, 'category')">{category_display}</td>
                         <td>{data['count']}</td>
@@ -1947,7 +1947,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="5"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -1992,7 +1992,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         merchant_id = merchant.replace("'", "").replace('"', '').replace(' ', '_')
         cat_data = f"{data.get('category', '')}/{data.get('subcategory', '')}".lower()
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td class="category clickable" onclick="addFilterFromCell(event, this, 'category')">{data['category']}</td>
                         <td>{data['count']}</td>
@@ -2003,7 +2003,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="5"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -2052,7 +2052,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         merchant_id = merchant.replace("'", "").replace('"', '').replace(' ', '_')
         cat_data = f"{data.get('category', '')}/{data.get('subcategory', '')}".lower()
         html += f'''
-                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" onclick="toggleTransactions(this)">
+                    <tr class="merchant-row" data-merchant="{merchant_id}" data-category="{cat_data}" data-ytd="{data['total']:.2f}" onclick="toggleTransactions(this)">
                         <td class="merchant"><span class="chevron clickable" onclick="toggleTransactionsFromChevron(event, this)">▶</span> <span class="clickable" onclick="addFilterFromCell(event, this, 'merchant')">{merchant}</span></td>
                         <td class="category"><span class="clickable" onclick="addFilterFromCell(event, this, 'category')">{data['category']}</span>/<span class="clickable" onclick="addFilterFromCell(event, this, 'category')">{data['subcategory']}</span></td>
                         <td>{months}</td>
@@ -2065,7 +2065,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
         sorted_txns = sorted(data.get('transactions', []), key=lambda x: x['date'], reverse=True)
         for txn in sorted_txns:
             html += f'''
-                    <tr class="txn-row hidden" data-merchant="{merchant_id}">
+                    <tr class="txn-row hidden" data-merchant="{merchant_id}" data-amount="{txn['amount']:.2f}">
                         <td colspan="7"><div class="txn-detail"><span class="txn-date">{txn['date']}</span><span class="txn-desc">{txn['description']}</span><span class="txn-amount">${txn['amount']:,.2f}</span><span class="txn-source {txn['source'].lower()}">{txn['source']}</span>{location_badge(txn.get('location'))}</div></td>
                     </tr>'''
 
@@ -2587,14 +2587,14 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
             let monthlySum = 0;
             let ytdSum = 0;
 
-            // First pass: calculate totals from visible rows
+            // First pass: calculate totals from visible rows using data-ytd attribute for precision
             rows.forEach(row => {{
                 if (!row.classList.contains('hidden')) {{
-                    if (monthlyColIndex !== null && row.cells[monthlyColIndex] && !monthlyFromYtd) {{
+                    // Use data-ytd attribute for precise calculations
+                    const ytdValue = parseFloat(row.dataset.ytd) || 0;
+                    ytdSum += ytdValue;
+                    if (monthlyColIndex !== null && !monthlyFromYtd) {{
                         monthlySum += parseMoney(row.cells[monthlyColIndex].textContent);
-                    }}
-                    if (ytdColIndex !== null && row.cells[ytdColIndex]) {{
-                        ytdSum += parseMoney(row.cells[ytdColIndex].textContent);
                     }}
                 }}
             }});
@@ -2608,7 +2608,7 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
             if (pctColIndex !== null && ytdSum > 0) {{
                 rows.forEach(row => {{
                     if (!row.classList.contains('hidden') && row.cells[pctColIndex]) {{
-                        const rowYtd = ytdColIndex !== null && row.cells[ytdColIndex] ? parseMoney(row.cells[ytdColIndex].textContent) : 0;
+                        const rowYtd = parseFloat(row.dataset.ytd) || 0;
                         const pct = (rowYtd / ytdSum * 100).toFixed(1);
                         row.cells[pctColIndex].textContent = pct + '%';
                     }}
@@ -2815,13 +2815,11 @@ def write_summary_file(stats, filepath, year=2025, home_locations=None):
             }};
 
             document.querySelectorAll('tr.txn-row:not(.hidden)').forEach(txn => {{
-                const amountEl = txn.querySelector('.txn-amount');
-                if (amountEl) {{
-                    const amount = parseFloat(amountEl.textContent.replace(/[$,]/g, '')) || 0;
-                    const tableId = txn.closest('table')?.id;
-                    if (tableId && sectionTotals.hasOwnProperty(tableId)) {{
-                        sectionTotals[tableId] += amount;
-                    }}
+                // Use data-amount attribute for precise calculations
+                const amount = parseFloat(txn.dataset.amount) || 0;
+                const tableId = txn.closest('table')?.id;
+                if (tableId && sectionTotals.hasOwnProperty(tableId)) {{
+                    sectionTotals[tableId] += amount;
                 }}
             }});
 
