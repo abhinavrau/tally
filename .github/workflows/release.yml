@@ -85,6 +85,40 @@ jobs:
           echo "version=0.1.${COMMIT_COUNT}" >> $GITHUB_OUTPUT
           echo "Version: 0.1.${COMMIT_COUNT}"
 
+      - name: Build release body
+        id: body
+        env:
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          {
+            if [ -n "$RELEASE_NOTES" ]; then
+              echo "## What's Changed"
+              echo ""
+              echo "$RELEASE_NOTES"
+              echo ""
+              echo "---"
+              echo ""
+            fi
+            echo "### Install"
+            echo ""
+            echo "**Linux / macOS:**"
+            echo '```bash'
+            echo "curl -fsSL https://tallyai.money/install.sh | bash"
+            echo '```'
+            echo ""
+            echo "**Windows PowerShell:**"
+            echo '```powershell'
+            echo "irm https://tallyai.money/install.ps1 | iex"
+            echo '```'
+            echo ""
+            echo "Or download the zip for your platform from the assets below."
+            echo ""
+            echo "See https://tallyai.money for more info."
+          } > body.md
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat body.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -104,19 +138,4 @@ jobs:
             artifacts/tally-linux-amd64/tally-linux-amd64.zip
             artifacts/tally-macos-amd64/tally-macos-amd64.zip
             artifacts/tally-windows-amd64/tally-windows-amd64.zip
-          body: |
-            ${{ inputs.release_notes != '' && format('## What''s Changed\n\n{0}\n\n---\n\n', inputs.release_notes) || '' }}### Install
-
-            **Linux / macOS:**
-            ```bash
-            curl -fsSL https://tallyai.money/install.sh | bash
-            ```
-
-            **Windows PowerShell:**
-            ```powershell
-            irm https://tallyai.money/install.ps1 | iex
-            ```
-
-            Or download the zip for your platform from the assets below.
-
-            See https://tallyai.money for more info.
+          body: ${{ steps.body.outputs.content }}
