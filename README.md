@@ -37,6 +37,8 @@ tally run                    # Generate spending report
 | `tally discover` | Find uncategorized transactions (`--format json` for LLMs) |
 | `tally inspect <csv>` | Show CSV structure to build format string |
 | `tally diag` | Debug config issues |
+| `tally version` | Show version and check for updates |
+| `tally update` | Update to latest version |
 
 ## Configuration
 
@@ -71,6 +73,16 @@ data_sources:
 | `{amount}` | Amount (positive = expense) |
 | `{-amount}` | Negated amount (for banks where negative = expense) |
 | `{_}` | Skip column |
+| `{custom_name}` | Capture column for use in description template |
+
+**Multi-column descriptions** - Some banks split info across columns:
+```yaml
+- name: European Bank
+  file: data/bank.csv
+  format: "{date:%d.%m.%Y},{_},{txn_type},{vendor},{_},{amount}"
+  columns:
+    description: "{vendor} ({txn_type})"  # Combines into "STORE NAME (Card payment)"
+```
 
 ### merchant_categories.csv
 
