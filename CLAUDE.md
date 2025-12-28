@@ -38,6 +38,7 @@ uv run pytest tests/test_analyzer.py -v # Run analyzer tests
 **Releases:**
 - YOU MUST use GitHub workflow for releases
 - YOU MUST NOT create releases manually or tag commits directly
+- YOU MUST update release notes after workflow completes (see Release Process below)
 
 **Commits:**
 - YOU MUST use `Fixes #<issue>` or `Closes #<issue>` syntax to auto-close issues:
@@ -53,6 +54,38 @@ uv run pytest tests/test_analyzer.py -v # Run analyzer tests
 - YOU MUST implement automatic migration in `config_loader.py` if breaking changes are unavoidable
 - YOU MUST document new options in `config/settings.yaml.example`
 - YOU MUST update AGENTS.md in `cli.py` for new user-facing features
+
+## Release Process
+
+1. **Check commits since last release:**
+   ```bash
+   git fetch --tags
+   gh release list --limit 1                    # Get latest version
+   git log v0.1.XX..HEAD --oneline              # See what's new
+   ```
+
+2. **Draft release notes** focusing on user-facing features (not repo/doc changes):
+   - New Features (with code examples)
+   - Bug Fixes
+   - Improvements
+
+3. **Trigger release with notes:**
+   ```bash
+   gh workflow run release.yml -f release_notes="
+   ### Currency Display Format (Issue #12)
+   Display amounts in your local currency:
+   \`\`\`yaml
+   currency_format: \"€{amount}\"  # Euro
+   currency_format: \"{amount} zł\" # Złoty
+   \`\`\`
+
+   ### Bug Fixes
+   - Fixed X
+   "
+   gh run watch                                 # Wait for completion
+   ```
+
+   The workflow auto-appends install instructions to your notes.
 
 ## Error Messages & Diagnostics
 
