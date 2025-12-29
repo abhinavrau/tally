@@ -1250,19 +1250,19 @@ def apply_special_transformations(description):
 
     # Metropolitan Market has multiple formats
     if 'METROPOLITAN' in desc_upper and ('MARKET' in desc_upper or 'KIRKLAND' in desc_upper):
-        return ('Metropolitan Market', 'Food', 'Grocery')
+        return ('Metropolitan Market', 'Food', 'Grocery', 'METROPOLITAN + MARKET/KIRKLAND')
 
     # Din Tai Fung variations
     if 'DIN TAI' in desc_upper or 'DINTAI' in desc_upper:
-        return ('Din Tai Fung', 'Food', 'Restaurant')
+        return ('Din Tai Fung', 'Food', 'Restaurant', 'DIN TAI or DINTAI')
 
     # Gap family of brands
     if re.search(r'GAP\s*(US|ONLINE|\d)|OLDNAVY|OLD NAVY|BANANA\s*REPUBLIC', desc_upper):
-        return ('Gap/Old Navy/BR', 'Shopping', 'Clothing')
+        return ('Gap/Old Navy/BR', 'Shopping', 'Clothing', r'GAP\s*(US|ONLINE|\d)|OLDNAVY|OLD NAVY|BANANA\s*REPUBLIC')
 
     # Barnes & Noble variations
     if 'BARNES' in desc_upper and 'NOBLE' in desc_upper:
-        return ('Barnes & Noble', 'Shopping', 'Books')
+        return ('Barnes & Noble', 'Shopping', 'Books', 'BARNES + NOBLE')
 
     # =========================================================================
     # DESCRIPTION CLEANUP FOR SPECIFIC MERCHANTS
@@ -1270,17 +1270,17 @@ def apply_special_transformations(description):
 
     # DoorDash has many variations
     if re.search(r'DOORDASH|DD\s*\*|DOORDASAN', desc_upper):
-        return ('DoorDash', 'Food', 'Delivery')
+        return ('DoorDash', 'Food', 'Delivery', r'DOORDASH|DD\s*\*|DOORDASAN')
 
     # Uber Eats vs Uber rideshare
     if 'UBER' in desc_upper:
         if 'EATS' in desc_upper:
-            return ('Uber Eats', 'Food', 'Delivery')
+            return ('Uber Eats', 'Food', 'Delivery', 'UBER + EATS')
         elif 'TRIP' in desc_upper or 'RIDE' in desc_upper:
-            return ('Uber', 'Transport', 'Rideshare')
+            return ('Uber', 'Transport', 'Rideshare', 'UBER + TRIP/RIDE')
         # Ambiguous - check for food-related context
         if any(word in desc_upper for word in ['RESTAURANT', 'FOOD', 'DELIVERY']):
-            return ('Uber Eats', 'Food', 'Delivery')
+            return ('Uber Eats', 'Food', 'Delivery', 'UBER + RESTAURANT/FOOD/DELIVERY')
 
     # =========================================================================
     # CHECK HANDLING
@@ -1288,11 +1288,11 @@ def apply_special_transformations(description):
 
     # Check numbers
     if re.match(r'^CHECK\s*\d+', desc_upper):
-        return ('Check', 'Cash', 'Check')
+        return ('Check', 'Cash', 'Check', r'^CHECK\s*\d+')
 
     # Check order fee
     if 'CHECK ORDER' in desc_upper:
-        return ('Check Order', 'Bills', 'Fee')
+        return ('Check Order', 'Bills', 'Fee', 'CHECK ORDER')
 
     return None  # No special transformation applies
 
@@ -1319,7 +1319,8 @@ def normalize_merchant(
     # First, try special transformations
     special = apply_special_transformations(description)
     if special:
-        return (*special, {'pattern': '(special transformation)', 'source': 'special'})
+        merchant, category, subcategory, pattern = special
+        return (merchant, category, subcategory, {'pattern': pattern, 'source': 'built-in'})
 
     # Clean the description for better matching
     cleaned = clean_description(description)
