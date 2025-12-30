@@ -529,17 +529,11 @@ def cmd_init(args):
         # Already initialized
         if has_data_sources:
             print(f"""
-{C.GREEN}✓ Already set up.{C.RESET} Run {C.CYAN}tally run{C.RESET} or {C.CYAN}tally discover{C.RESET}
+{C.GREEN}✓ Already set up.{C.RESET} Run {C.CYAN}tally workflow{C.RESET} to see next steps.
 """)
         else:
             print(f"""
-{C.GREEN}✓ Config exists.{C.RESET}
-
-  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{rel_data}{C.RESET}
-
-  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{rel_settings}{C.RESET}
-
-{C.DIM}See README.md for more details.{C.RESET}
+{C.GREEN}✓ Config exists.{C.RESET} Run {C.CYAN}tally workflow{C.RESET} to see next steps.
 """)
     else:
         # Helper for clickable links (OSC 8 hyperlinks, with fallback)
@@ -579,12 +573,9 @@ def cmd_init(args):
 {agents_block}
      {C.DIM}Or any agent that can run command-line tools.{C.RESET}
 
-  {C.BOLD}4.{C.RESET} Tell the agent: {C.GREEN}"Set up tally with my statements"{C.RESET}
+  {C.BOLD}4.{C.RESET} Run {C.GREEN}tally workflow{C.RESET} to see next steps
 
-The agent reads {C.CYAN}AGENTS.md{C.RESET} and handles the rest - configuring data sources,
-categorizing merchants, and generating reports.
-
-{C.DIM}See README.md for more details.{C.RESET}
+{C.DIM}The agent can run tally workflow at any time to see context-aware instructions.{C.RESET}
 """)
 
 
@@ -1313,6 +1304,27 @@ def cmd_workflow(args):
     unknown_count = 0
     total_unknown_spend = 0
 
+    # Calculate relative paths for display (OS-aware)
+    def make_path(relative_to_config_parent, trailing_sep=False):
+        """Create display path relative to cwd with correct OS separators."""
+        if config_dir:
+            parent = os.path.dirname(config_dir)
+            full_path = os.path.join(parent, relative_to_config_parent)
+        else:
+            full_path = relative_to_config_parent
+        rel = os.path.relpath(full_path)
+        if trailing_sep:
+            rel = rel + os.sep
+        # Add ./ prefix on Unix only
+        if os.sep == '/' and not rel.startswith('.'):
+            rel = './' + rel
+        return rel
+
+    # Default paths (used when no config exists)
+    path_data = make_path('data', trailing_sep=True) if config_dir else './data/'
+    path_settings = make_path(os.path.join('config', 'settings.yaml')) if config_dir else './config/settings.yaml'
+    path_rules = make_path(os.path.join('config', 'merchant_categories.csv')) if config_dir else './config/merchant_categories.csv'
+
     if has_config:
         try:
             config = load_config(config_dir)
@@ -1335,90 +1347,91 @@ def cmd_workflow(args):
         except Exception:
             pass
 
-    # Build context-aware output
-    print(f"{C.BOLD}TALLY WORKFLOW{C.RESET}")
-    print("=" * 50)
-    print()
-
-    # Show current state
-    print(f"{C.BOLD}Current State:{C.RESET}")
-    if not has_config:
-        print(f"  {C.YELLOW}⚠{C.RESET} No config directory found")
+    # Helper for section headers
+    def section(title):
         print()
-        print(f"{C.BOLD}SETUP{C.RESET}")
-        print("1. Run: tally init")
-        print("2. Add bank/credit card CSVs to ./data/")
-        print("3. Configure data sources in ./config/settings.yaml")
-        print("4. Run: tally workflow (to see next steps)")
+        print(f"{C.BOLD}{C.CYAN}▸ {title}{C.RESET}")
+
+    # Build context-aware output
+    print()
+    print(f"{C.BOLD}  TALLY WORKFLOW{C.RESET}")
+    print(f"{C.DIM}  ─────────────────────────────────────────{C.RESET}")
+
+    # Status bar
+    if not has_config:
+        print(f"  {C.YELLOW}●{C.RESET} No config found")
+        section("Getting Started")
+        print(f"    {C.DIM}1.{C.RESET} Initialize the project:")
+        print(f"       {C.GREEN}tally init{C.RESET}")
+        print()
+        print(f"    {C.DIM}2.{C.RESET} Add bank/credit card CSVs to {C.CYAN}./data/{C.RESET}")
+        print()
+        print(f"    {C.DIM}3.{C.RESET} Configure data sources in {C.CYAN}./config/settings.yaml{C.RESET}")
+        print()
         return
 
     if not has_data_sources:
-        print(f"  {C.YELLOW}⚠{C.RESET} No data sources configured")
+        print(f"  {C.YELLOW}●{C.RESET} No data sources configured")
+        section("Setup Data Sources")
+        print(f"    {C.DIM}1.{C.RESET} Add bank/credit card CSVs to {C.CYAN}{path_data}{C.RESET}")
         print()
-        print(f"{C.BOLD}SETUP DATA SOURCES{C.RESET}")
-        print("1. Add bank/credit card CSVs to ./data/")
-        print("2. Run: tally inspect ./data/yourfile.csv")
-        print("   (to see columns and get format string)")
-        print("3. Edit ./config/settings.yaml:")
-        print(f"""
-   {C.DIM}data_sources:
-     - name: My Card
-       file: data/transactions.csv
-       format: "{{date:%m/%d/%Y}},{{description}},{{amount}}"{C.RESET}
-""")
-        print("4. Run: tally workflow (to see next steps)")
+        print(f"    {C.DIM}2.{C.RESET} Inspect your file to get the format string:")
+        print(f"       {C.GREEN}tally inspect {path_data}yourfile.csv{C.RESET}")
+        print()
+        print(f"    {C.DIM}3.{C.RESET} Add to {C.CYAN}{path_settings}{C.RESET}:")
+        print(f"       {C.DIM}data_sources:")
+        print(f"         - name: My Card")
+        print(f"           file: data/transactions.csv")
+        print(f"           format: \"{{date:%m/%d/%Y}},{{description}},{{amount}}\"{C.RESET}")
+        print()
         return
 
+    # Configured state
     if unknown_count > 0:
-        print(f"  {C.GREEN}✓{C.RESET} Config found")
-        print(f"  {C.GREEN}✓{C.RESET} Data sources configured")
-        print(f"  {C.YELLOW}⚠{C.RESET} {unknown_count} unknown merchants (${total_unknown_spend:,.0f} spend)")
+        print(f"  {C.GREEN}●{C.RESET} Config ready  {C.DIM}│{C.RESET}  {C.YELLOW}●{C.RESET} {unknown_count} unknown merchants {C.DIM}(${total_unknown_spend:,.0f}){C.RESET}")
     else:
-        print(f"  {C.GREEN}✓{C.RESET} Config found")
-        print(f"  {C.GREEN}✓{C.RESET} Data sources configured")
-        print(f"  {C.GREEN}✓{C.RESET} All merchants categorized")
+        print(f"  {C.GREEN}●{C.RESET} Config ready  {C.DIM}│{C.RESET}  {C.GREEN}●{C.RESET} All merchants categorized")
 
-    print()
-
-    # Show relevant workflow
+    # Show categorization workflow if there are unknowns
     if unknown_count > 0:
-        print(f"{C.BOLD}CATEGORIZATION LOOP{C.RESET}")
-        print("1. Run: tally discover --format json")
-        print("   (get unknown merchants sorted by spend)")
-        print("2. For each unknown, add a rule to ./config/merchant_categories.csv:")
-        print(f"   {C.DIM}Pattern,Merchant,Category,Subcategory,Tags{C.RESET}")
-        print(f"   {C.DIM}STARBUCKS,Starbucks,Food,Coffee,{C.RESET}")
-        print("3. Run: tally run --summary")
-        print("   (verify categorization improved)")
-        print("4. Repeat until no unknowns")
+        section("Categorization Workflow")
+        print(f"    {C.DIM}1.{C.RESET} Get unknown merchants with suggested patterns:")
+        print(f"       {C.GREEN}tally discover --format json{C.RESET}")
         print()
+        print(f"    {C.DIM}2.{C.RESET} Add rules to {C.CYAN}{path_rules}{C.RESET}:")
+        print(f"       {C.DIM}Pattern,Merchant,Category,Subcategory,Tags")
+        print(f"       STARBUCKS,Starbucks,Food,Coffee,")
+        print(f"       UBER\\s(?!EATS),Uber,Transport,Rideshare,business{C.RESET}")
+        print()
+        print(f"    {C.DIM}3.{C.RESET} Check progress:")
+        print(f"       {C.GREEN}tally run --summary{C.RESET}")
+        print()
+        print(f"    {C.DIM}Repeat until all merchants are categorized{C.RESET}")
 
-    print(f"{C.BOLD}COMMANDS{C.RESET}")
-    print(f"  {C.CYAN}tally run{C.RESET}              Generate HTML spending report")
-    print(f"  {C.CYAN}tally run --summary{C.RESET}    Quick text summary")
-    print(f"  {C.CYAN}tally discover{C.RESET}         Find unknown merchants with suggested patterns")
-    print(f"  {C.CYAN}tally explain{C.RESET}          Debug why merchants are classified")
-    print(f"  {C.CYAN}tally diag{C.RESET}             Diagnose config/parsing issues")
-    print(f"  {C.CYAN}tally inspect FILE{C.RESET}     Analyze CSV structure")
+    section("Commands")
+    cmds = [
+        ("tally run", "Generate HTML spending report"),
+        ("tally run --summary", "Quick text summary"),
+        ("tally discover", "Find unknown merchants"),
+        ("tally explain <merchant>", "Debug classification"),
+        ("tally diag", "Diagnose config issues"),
+    ]
+    for cmd, desc in cmds:
+        print(f"    {C.GREEN}{cmd:<24}{C.RESET} {C.DIM}{desc}{C.RESET}")
+
+    section("Pattern Syntax")
+    print(f"    {C.DIM}Patterns are Python regex, case-insensitive{C.RESET}")
+    patterns = [
+        ("STARBUCKS", "contains STARBUCKS"),
+        ("UBER|LYFT", "either UBER or LYFT"),
+        ("UBER\\s(?!EATS)", "UBER but not UBER EATS"),
+    ]
+    for pattern, desc in patterns:
+        print(f"    {C.CYAN}{pattern:<20}{C.RESET} {C.DIM}{desc}{C.RESET}")
+
     print()
-
-    print(f"{C.BOLD}PATTERN SYNTAX{C.RESET} (Python regex, case-insensitive)")
-    print(f"  {C.CYAN}STARBUCKS{C.RESET}              Contains 'STARBUCKS'")
-    print(f"  {C.CYAN}UBER|LYFT{C.RESET}              Either UBER or LYFT")
-    print(f"  {C.CYAN}UBER\\s(?!EATS){C.RESET}         UBER but not UBER EATS")
-    print(f"  {C.CYAN}COSTCO(?!.*GAS){C.RESET}        COSTCO without GAS after it")
+    print(f"  {C.DIM}Tip: First match wins — put specific patterns before general ones{C.RESET}")
     print()
-
-    print(f"{C.BOLD}COMMON CATEGORIES{C.RESET}")
-    print("  Food: Grocery, Restaurant, Coffee, Delivery")
-    print("  Shopping: Online, Retail, Clothing, Electronics")
-    print("  Travel: Airline, Lodging, Car Rental")
-    print("  Transport: Rideshare, Gas, Parking")
-    print("  Subscriptions: Streaming, Software")
-    print("  Bills: Rent, Utilities, Insurance")
-    print()
-
-    print(f"{C.DIM}Tip: First match wins - put specific patterns before general ones{C.RESET}")
 
 
 def cmd_update(args):
