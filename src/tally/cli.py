@@ -13,6 +13,43 @@ import os
 import shutil
 import sys
 
+# Terminal color support
+def _supports_color():
+    """Check if the terminal supports color output."""
+    if not sys.stdout.isatty():
+        return False
+    if os.environ.get('NO_COLOR'):
+        return False
+    if os.environ.get('FORCE_COLOR'):
+        return True
+    # Check for common terminal types
+    term = os.environ.get('TERM', '')
+    return term != 'dumb'
+
+class _Colors:
+    """ANSI color codes with automatic detection."""
+    def __init__(self):
+        if _supports_color():
+            self.RESET = '\033[0m'
+            self.BOLD = '\033[1m'
+            self.DIM = '\033[2m'
+            self.GREEN = '\033[32m'
+            self.CYAN = '\033[36m'
+            self.BLUE = '\033[34m'
+            self.YELLOW = '\033[33m'
+            self.UNDERLINE = '\033[4m'
+        else:
+            self.RESET = ''
+            self.BOLD = ''
+            self.DIM = ''
+            self.GREEN = ''
+            self.CYAN = ''
+            self.BLUE = ''
+            self.YELLOW = ''
+            self.UNDERLINE = ''
+
+C = _Colors()
+
 from ._version import (
     VERSION, GIT_SHA, REPO_URL, check_for_updates,
     get_latest_release_info, perform_update
@@ -1197,115 +1234,77 @@ Run `tally --help-config` for detailed configuration guide.
 def cmd_init(args):
     """Handle the 'init' subcommand."""
     target_dir = os.path.abspath(args.dir)
-    print(f"Initializing budget directory: {target_dir}")
-    print()
+    print(f"Initializing budget directory: {C.BOLD}{target_dir}{C.RESET}")
 
     created, skipped = init_config(target_dir)
 
     if created:
-        print("Created:")
+        print(f"{C.GREEN}✓ Created:{C.RESET}")
         for f in created:
-            print(f"  {f}")
+            print(f"  {C.DIM}{f}{C.RESET}")
 
     if skipped:
-        print("\nSkipped (already exist):")
+        print()
+        print(f"{C.DIM}Skipped (already exist):{C.RESET}")
         for f in skipped:
-            print(f"  {f}")
+            print(f"  {C.DIM}{f}{C.RESET}")
 
-    print(f"""
-================================================================================
-NEXT STEPS
-================================================================================
+    # Check if data sources are configured in settings.yaml
+    import yaml
+    has_data_sources = False
+    settings_path = os.path.join(target_dir, 'config', 'settings.yaml')
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, 'r') as f:
+                settings = yaml.safe_load(f) or {}
+                has_data_sources = bool(settings.get('data_sources'))
+        except Exception:
+            pass
 
-1. Export your bank/credit card statements to:
-   {target_dir}/data/
+    # Show appropriate next steps
+    if not created:
+        # Already initialized
+        if has_data_sources:
+            print(f"""
+{C.GREEN}✓ Already set up.{C.RESET} Run {C.CYAN}tally run{C.RESET} or {C.CYAN}tally discover{C.RESET}
+""")
+        else:
+            print(f"""
+{C.GREEN}✓ Config exists.{C.RESET}
 
-2. Edit settings to add your data sources:
-   {target_dir}/config/settings.yaml
+  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{target_dir}/data/{C.RESET}
+  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{settings_path}{C.RESET}
 
-   Example configuration:
-   ```yaml
-   year: 2025
-   data_sources:
-     - name: AMEX
-       file: data/amex-2025.csv
-       type: amex
-     - name: BOA Checking
-       file: data/checking.txt
-       type: boa
-   ```
+{C.DIM}See README.md for more details.{C.RESET}
+""")
+    else:
+        # Helper for clickable links (OSC 8 hyperlinks, with fallback)
+        def link(url, text=None):
+            text = text or url
+            if _supports_color():
+                return f"\033]8;;{url}\033\\{C.UNDERLINE}{C.BLUE}{text}{C.RESET}\033]8;;\033\\"
+            return url
 
-3. Run the analyzer:
-   tally run
+        print(f"""
+{C.BOLD}Next steps:{C.RESET}
 
-================================================================================
-LET AI DO THE WORK
-================================================================================
+  {C.BOLD}1.{C.RESET} Drop your bank/credit card exports into {C.CYAN}{target_dir}/data/{C.RESET}
 
-Why manually categorize hundreds of transactions? Let a coding agent do it!
-Open this folder in your preferred AI tool:
+  {C.BOLD}2.{C.RESET} Configure your data sources in {C.CYAN}{settings_path}{C.RESET}
 
-  Claude Code:    cd {target_dir} && claude
-  Cursor:         cursor {target_dir}
-  Copilot CLI:    cd {target_dir} && ghcs
-  OpenCode:       cd {target_dir} && opencode
+  {C.BOLD}3.{C.RESET} Open this folder in an AI agent:
+     {C.CYAN}claude{C.RESET}      Claude Code      {link('https://claude.com/product/claude-code')}
+     {C.CYAN}copilot{C.RESET}     GitHub Copilot   {link('https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli')}
+     {C.CYAN}opencode{C.RESET}    OpenCode         {link('https://opencode.ai')}
+     {C.CYAN}codex{C.RESET}       OpenAI Codex     {link('https://developers.openai.com/codex/cli')}
+     {C.DIM}Or any agent that can run command-line tools.{C.RESET}
 
-Then just tell it what you want:
+  {C.BOLD}4.{C.RESET} Tell the agent: {C.GREEN}"Set up tally with my statements"{C.RESET}
 
-  "Set up tally with my Amex statement in data/amex.csv"
-  "Run tally discover and categorize all unknown merchants"
-  "Show me where I'm spending the most money"
+The agent reads {C.CYAN}AGENTS.md{C.RESET} and handles the rest - configuring data sources,
+categorizing merchants, and generating reports.
 
-The agent reads AGENTS.md and knows how to use tally. You can literally
-just drop your bank statements in data/ and let the AI figure it out.
-
-================================================================================
-STATEMENT FILE FORMATS
-================================================================================
-
-AMEX (CSV):
-  Export from American Express website. Expected columns:
-  Date,Description,Amount
-  01/15/2025,AMAZON.COM,-45.99
-  01/16/2025,STARBUCKS STORE 12345,-6.50
-
-BOA (TXT):
-  Export from Bank of America. Space-separated format:
-  MM/DD/YYYY Description Amount Balance
-  01/15/2025 NETFLIX.COM DES:RECURRING -15.99 1234.56
-
-================================================================================
-MERCHANT CATEGORIZATION
-================================================================================
-
-Edit config/merchant_categories.csv to add patterns for your merchants.
-
-Format: Pattern,Merchant,Category,Subcategory
-
-Pattern Syntax (Python regex, case-insensitive):
-  NETFLIX              Contains "NETFLIX"
-  DELTA|SOUTHWEST      Matches "DELTA" OR "SOUTHWEST"
-  UBER\\s(?!EATS)       "UBER " not followed by "EATS"
-  COSTCO(?!.*GAS)      "COSTCO" without "GAS" anywhere after
-  ^ATT\\s               Starts with "ATT "
-
-Common Categories:
-  Food:          Grocery, Restaurant, Fast Food, Coffee, Delivery
-  Shopping:      Online, Retail, Clothing, Electronics, Home
-  Travel:        Airline, Lodging, Car Rental
-  Transport:     Rideshare, Gas, Parking
-  Subscriptions: Streaming, Software
-  Health:        Gym, Pharmacy, Medical
-  Bills:         Rent, Mortgage, Insurance
-  Transfers:     P2P, CC Payment
-
-Tips:
-  - First match wins - put specific patterns before general ones
-  - Run 'tally run --summary' to find Unknown transactions
-  - Test patterns at regex101.com (Python flavor)
-  - Lines starting with # are comments
-
-================================================================================
+{C.DIM}See README.md for more details.{C.RESET}
 """)
 
 
