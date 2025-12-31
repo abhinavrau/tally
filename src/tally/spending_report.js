@@ -156,7 +156,7 @@ createApp({
             return Object.keys(sections).length > 0;
         });
 
-        // Section view with filtering applied (for By Section tab)
+        // View mode with filtering applied (for By View tab)
         const filteredSectionView = computed(() => {
             const sections = spendingData.value.sections || {};
             const result = {};

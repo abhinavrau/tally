@@ -198,7 +198,7 @@ else
 fi
 
 # Check HTML report has section view toggle
-if grep -q "By Section\|section-view\|sectionView" output/spending_summary.html 2>/dev/null; then
+if grep -q "By View\|section-view\|sectionView" output/spending_summary.html 2>/dev/null; then
     echo "✓ HTML report has view support"
 else
     echo "Note: View mode not found in HTML (views may be empty)"

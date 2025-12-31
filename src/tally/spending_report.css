@@ -1129,7 +1129,7 @@ section:nth-child(5) { animation-delay: 0.4s; }
     color: var(--text-muted);
 }
 
-/* View Toggle (By Category / By Section) */
+/* View Toggle (By Category / By View) */
 .view-toggle {
     display: flex;
     justify-content: center;

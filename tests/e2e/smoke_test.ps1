@@ -188,7 +188,7 @@ subcategory: Other
 
     # Check HTML report has view toggle
     $htmlContent = Get-Content "output/spending_summary.html" -Raw
-    if ($htmlContent -match "By Section|section-view|sectionView") {
+    if ($htmlContent -match "By View|section-view|sectionView") {
         Write-Host "✓ HTML report has view support" -ForegroundColor Green
     } else {
         Write-Host "Note: View mode not found in HTML (views may be empty)" -ForegroundColor Yellow
