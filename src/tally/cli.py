@@ -842,9 +842,9 @@ def cmd_init(args):
 
     # Brief descriptions for key files
     file_descriptions = {
-        'config/merchants.rules': 'categorize transactions by merchant',
-        'config/views.rules': 'group merchants into report sections',
-        'config/settings.yaml': 'data sources and settings',
+        'config/merchants.rules': 'match transactions to categories',
+        'config/views.rules': 'organize report by spending patterns',
+        'config/settings.yaml': 'configure data sources',
     }
 
     for f, was_created in all_files:
@@ -2271,7 +2271,7 @@ def cmd_workflow(args):
         print()
         section("Then: Categorize Transactions")
         print(f"    {C.DIM}Use{C.RESET} {C.GREEN}tally discover{C.RESET} {C.DIM}to find merchants, add rules to:{C.RESET}")
-        print(f"    {C.CYAN}{path_merchants}{C.RESET} {C.DIM}— pattern matching for categories{C.RESET}")
+        print(f"    {C.CYAN}{path_merchants}{C.RESET} {C.DIM}— match transactions to categories{C.RESET}")
         print()
         return
 
