@@ -170,16 +170,26 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Merchant</th>
-                                            <th>Subcategory</th>
-                                            <th>Count</th>
+                                            <th @click="toggleSort('sec:' + sectionId, 'merchant')"
+                                                :class="{ 'sorted-asc': sortConfig['sec:' + sectionId]?.column === 'merchant' && sortConfig['sec:' + sectionId]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['sec:' + sectionId]?.column === 'merchant' && sortConfig['sec:' + sectionId]?.dir === 'desc' }">Merchant</th>
+                                            <th @click="toggleSort('sec:' + sectionId, 'subcategory')"
+                                                :class="{ 'sorted-asc': sortConfig['sec:' + sectionId]?.column === 'subcategory' && sortConfig['sec:' + sectionId]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['sec:' + sectionId]?.column === 'subcategory' && sortConfig['sec:' + sectionId]?.dir === 'desc' }">Subcategory</th>
+                                            <th @click="toggleSort('sec:' + sectionId, 'count')"
+                                                :class="{ 'sorted-asc': sortConfig['sec:' + sectionId]?.column === 'count' && sortConfig['sec:' + sectionId]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['sec:' + sectionId]?.column === 'count' && sortConfig['sec:' + sectionId]?.dir === 'desc' }">Count</th>
                                             <th>Tags</th>
-                                            <th>Total</th>
-                                            <th>%</th>
+                                            <th @click="toggleSort('sec:' + sectionId, 'total')"
+                                                :class="{ 'sorted-asc': sortConfig['sec:' + sectionId]?.column === 'total' && sortConfig['sec:' + sectionId]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['sec:' + sectionId]?.column === 'total' && sortConfig['sec:' + sectionId]?.dir === 'desc' }">Total</th>
+                                            <th @click="toggleSort('sec:' + sectionId, 'total')"
+                                                :class="{ 'sorted-asc': sortConfig['sec:' + sectionId]?.column === 'total' && sortConfig['sec:' + sectionId]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['sec:' + sectionId]?.column === 'total' && sortConfig['sec:' + sectionId]?.dir === 'desc' }">%</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <template v-for="(merchant, merchantId) in sortedMerchants(section.filteredMerchants)" :key="merchantId">
+                                        <template v-for="(merchant, merchantId) in section.filteredMerchants" :key="merchantId">
                                             <tr class="merchant-row"
                                                 :class="{ expanded: expandedMerchants.has(merchantId) }"
                                                 @click="toggleExpand(merchantId)">
@@ -246,6 +256,7 @@
                     <section class="category-section">
                         <div class="section-header" @click="toggleSection('cat:' + categoryName)">
                             <h2>
+                                <span class="category-dot" :style="{ backgroundColor: categoryColorMap[categoryName] }"></span>
                                 <span class="toggle">{{ collapsedSections.has('cat:' + categoryName) ? '▶' : '▼' }}</span>
                                 {{ categoryName }}
                             </h2>
@@ -260,64 +271,72 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Merchant</th>
-                                            <th>Subcategory</th>
-                                            <th>Count</th>
+                                            <th @click="toggleSort('cat:' + categoryName, 'merchant')"
+                                                :class="{ 'sorted-asc': sortConfig['cat:' + categoryName]?.column === 'merchant' && sortConfig['cat:' + categoryName]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['cat:' + categoryName]?.column === 'merchant' && sortConfig['cat:' + categoryName]?.dir === 'desc' }">Merchant</th>
+                                            <th @click="toggleSort('cat:' + categoryName, 'subcategory')"
+                                                :class="{ 'sorted-asc': sortConfig['cat:' + categoryName]?.column === 'subcategory' && sortConfig['cat:' + categoryName]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['cat:' + categoryName]?.column === 'subcategory' && sortConfig['cat:' + categoryName]?.dir === 'desc' }">Subcategory</th>
+                                            <th @click="toggleSort('cat:' + categoryName, 'count')"
+                                                :class="{ 'sorted-asc': sortConfig['cat:' + categoryName]?.column === 'count' && sortConfig['cat:' + categoryName]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['cat:' + categoryName]?.column === 'count' && sortConfig['cat:' + categoryName]?.dir === 'desc' }">Count</th>
                                             <th>Tags</th>
-                                            <th>Total</th>
-                                            <th>%</th>
+                                            <th @click="toggleSort('cat:' + categoryName, 'total')"
+                                                :class="{ 'sorted-asc': sortConfig['cat:' + categoryName]?.column === 'total' && sortConfig['cat:' + categoryName]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['cat:' + categoryName]?.column === 'total' && sortConfig['cat:' + categoryName]?.dir === 'desc' }">Total</th>
+                                            <th @click="toggleSort('cat:' + categoryName, 'total')"
+                                                :class="{ 'sorted-asc': sortConfig['cat:' + categoryName]?.column === 'total' && sortConfig['cat:' + categoryName]?.dir === 'asc',
+                                                          'sorted-desc': sortConfig['cat:' + categoryName]?.column === 'total' && sortConfig['cat:' + categoryName]?.dir === 'desc' }">%</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <template v-for="(subcat, subcatName) in category.filteredSubcategories" :key="subcatName">
-                                            <template v-for="(merchant, merchantId) in sortedMerchants(subcat.filteredMerchants)" :key="merchantId">
-                                                <tr class="merchant-row"
-                                                    :class="{ expanded: expandedMerchants.has(merchantId) }"
-                                                    @click="toggleExpand(merchantId)">
-                                                    <td class="merchant clickable">
-                                                        <span class="chevron">{{ expandedMerchants.has(merchantId) ? '▼' : '▶' }}</span>
-                                                        <span @click.stop="addFilter(merchantId, 'merchant', merchant.displayName)">
-                                                            {{ merchant.displayName }}
+                                        <template v-for="merchant in category.sortedMerchants" :key="merchant.id">
+                                            <tr class="merchant-row"
+                                                :class="{ expanded: expandedMerchants.has(merchant.id) }"
+                                                @click="toggleExpand(merchant.id)">
+                                                <td class="merchant clickable">
+                                                    <span class="chevron">{{ expandedMerchants.has(merchant.id) ? '▼' : '▶' }}</span>
+                                                    <span @click.stop="addFilter(merchant.id, 'merchant', merchant.displayName)">
+                                                        {{ merchant.displayName }}
+                                                    </span>
+                                                </td>
+                                                <td class="category clickable" @click.stop="addFilter(merchant.subcategory, 'category')">
+                                                    {{ merchant.subcategory }}
+                                                </td>
+                                                <td>{{ merchant.filteredCount }}</td>
+                                                <td class="tags-cell">
+                                                    <span v-for="tag in (merchant.tags || [])"
+                                                          :key="tag"
+                                                          class="tag-badge"
+                                                          @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
+                                                </td>
+                                                <td class="money">{{ formatCurrency(merchant.filteredTotal) }}</td>
+                                                <td class="pct">{{ formatPct(merchant.filteredTotal, category.filteredTotal) }}</td>
+                                            </tr>
+                                            <tr v-for="txn in merchant.filteredTxns"
+                                                :key="txn.id"
+                                                class="txn-row"
+                                                :class="{ hidden: !expandedMerchants.has(merchant.id) }">
+                                                <td colspan="6">
+                                                    <div class="txn-detail">
+                                                        <span class="txn-date">{{ formatDate(txn.date) }}</span>
+                                                        <span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
+                                                        <span class="txn-desc">{{ txn.description }}</span>
+                                                        <span class="txn-amount">{{ formatCurrency(txn.amount) }}</span>
+                                                        <span class="txn-badge" :class="{ refund: txn.amount < 0 }">{{ txn.amount < 0 ? 'REFUND' : '' }}</span>
+                                                        <span v-if="txn.location"
+                                                              class="txn-location clickable"
+                                                              :class="getLocationClass(txn.location)"
+                                                              @click.stop="addFilter(txn.location, 'location')">
+                                                            {{ txn.location }}
                                                         </span>
-                                                    </td>
-                                                    <td class="category clickable" @click.stop="addFilter(subcatName, 'category')">
-                                                        {{ subcatName }}
-                                                    </td>
-                                                    <td>{{ merchant.filteredCount }}</td>
-                                                    <td class="tags-cell">
-                                                        <span v-for="tag in (merchant.tags || [])"
+                                                        <span v-for="tag in (txn.tags || [])"
                                                               :key="tag"
                                                               class="tag-badge"
                                                               @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
-                                                    </td>
-                                                    <td class="money">{{ formatCurrency(merchant.filteredTotal) }}</td>
-                                                    <td class="pct">{{ formatPct(merchant.filteredTotal, category.filteredTotal) }}</td>
-                                                </tr>
-                                                <tr v-for="txn in merchant.filteredTxns"
-                                                    :key="txn.id"
-                                                    class="txn-row"
-                                                    :class="{ hidden: !expandedMerchants.has(merchantId) }">
-                                                    <td colspan="6">
-                                                        <div class="txn-detail">
-                                                            <span class="txn-date">{{ formatDate(txn.date) }}</span>
-                                                            <span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
-                                                            <span class="txn-desc">{{ txn.description }}</span>
-                                                            <span class="txn-amount">{{ formatCurrency(txn.amount) }}</span>
-                                                            <span class="txn-badge" :class="{ refund: txn.amount < 0 }">{{ txn.amount < 0 ? 'REFUND' : '' }}</span>
-                                                            <span v-if="txn.location"
-                                                                  class="txn-location clickable"
-                                                                  :class="getLocationClass(txn.location)"
-                                                                  @click.stop="addFilter(txn.location, 'location')">
-                                                                {{ txn.location }}
-                                                            </span>
-                                                            <span v-for="tag in (txn.tags || [])"
-                                                                  :key="tag"
-                                                                  class="tag-badge"
-                                                                  @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            </template>
+                                                    </div>
+                                                </td>
+                                            </tr>
                                         </template>
                                         <tr class="total-row">
                                             <td colspan="4">Total</td>

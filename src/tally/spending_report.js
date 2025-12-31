@@ -25,6 +25,7 @@ createApp({
         const helpCollapsed = ref(true);
         const showExcluded = ref(false); // Toggle for excluded transactions (income/credits)
         const currentView = ref('category'); // 'category' or 'section'
+        const sortConfig = reactive({}); // { 'cat:Food': { column: 'total', dir: 'desc' } }
 
         // Chart refs
         const monthlyChart = ref(null);
@@ -144,6 +145,54 @@ createApp({
                 }
             }
 
+            // Create flattened sorted merchant list for each category
+            // Access sortConfig keys to ensure Vue tracks this as a dependency
+            const sortKeys = Object.keys(sortConfig);
+            for (const [catName, category] of Object.entries(result)) {
+                const key = 'cat:' + catName;
+                const cfg = sortConfig[key] || { column: 'total', dir: 'desc' };
+
+                // Flatten all merchants from all subcategories into one array
+                const allMerchants = [];
+                for (const [subName, subcat] of Object.entries(category.filteredSubcategories || {})) {
+                    for (const [merchantId, merchant] of Object.entries(subcat.filteredMerchants || {})) {
+                        allMerchants.push({
+                            id: merchantId,
+                            subcategory: subName,
+                            ...merchant
+                        });
+                    }
+                }
+
+                // Sort all merchants together
+                allMerchants.sort((a, b) => {
+                    let vA, vB;
+                    switch (cfg.column) {
+                        case 'merchant':
+                            vA = a.displayName.toLowerCase();
+                            vB = b.displayName.toLowerCase();
+                            break;
+                        case 'subcategory':
+                            vA = a.subcategory.toLowerCase();
+                            vB = b.subcategory.toLowerCase();
+                            break;
+                        case 'count':
+                            vA = a.filteredCount;
+                            vB = b.filteredCount;
+                            break;
+                        default:
+                            vA = a.filteredTotal;
+                            vB = b.filteredTotal;
+                    }
+                    if (typeof vA === 'string') {
+                        return cfg.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+                    }
+                    return cfg.dir === 'asc' ? vA - vB : vB - vA;
+                });
+
+                category.sortedMerchants = allMerchants;
+            }
+
             // Sort categories by total descending
             return Object.fromEntries(
                 Object.entries(result).sort((a, b) => b[1].filteredTotal - a[1].filteredTotal)
@@ -193,6 +242,15 @@ createApp({
                         filteredTotal: sectionTotal
                     };
                 }
+            }
+
+            // Sort merchants within each section based on sortConfig
+            // Access sortConfig keys to ensure Vue tracks this as a dependency
+            const sortKeys = Object.keys(sortConfig);
+            for (const [secId, section] of Object.entries(result)) {
+                const key = 'sec:' + secId;
+                const cfg = sortConfig[key] || { column: 'total', dir: 'desc' };
+                section.filteredMerchants = sortMerchantEntries(section.filteredMerchants, cfg.column, cfg.dir);
             }
 
             return result;
@@ -344,6 +402,19 @@ createApp({
             }
 
             return { byMonth, byCategory, byCategoryByMonth };
+        });
+
+        // Map category names to colors (matches pie chart order)
+        const categoryColorMap = computed(() => {
+            const agg = chartAggregations.value;
+            const entries = Object.entries(agg.byCategory)
+                .filter(([_, v]) => v > 0)
+                .sort((a, b) => b[1] - a[1]);
+            const colorMap = {};
+            entries.forEach((entry, idx) => {
+                colorMap[entry[0]] = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+            });
+            return colorMap;
         });
 
         // Filtered months for charts (respects month filters)
@@ -578,6 +649,49 @@ createApp({
                 collapsedSections.delete(sectionId);
             } else {
                 collapsedSections.add(sectionId);
+            }
+        }
+
+        // Sort merchants by configurable column and direction
+        function sortMerchantEntries(merchants, column, dir) {
+            return Object.entries(merchants || {})
+                .sort((a, b) => {
+                    const [, mA] = a, [, mB] = b;
+                    let vA, vB;
+                    switch (column) {
+                        case 'merchant':
+                            vA = mA.displayName.toLowerCase();
+                            vB = mB.displayName.toLowerCase();
+                            break;
+                        case 'subcategory':
+                            vA = (mA.subcategory || '').toLowerCase();
+                            vB = (mB.subcategory || '').toLowerCase();
+                            break;
+                        case 'count':
+                            vA = mA.filteredCount;
+                            vB = mB.filteredCount;
+                            break;
+                        default:
+                            vA = mA.filteredTotal;
+                            vB = mB.filteredTotal;
+                    }
+                    if (typeof vA === 'string') {
+                        return dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+                    }
+                    return dir === 'asc' ? vA - vB : vB - vA;
+                })
+                .reduce((acc, [id, m]) => { acc[id] = m; return acc; }, {});
+        }
+
+        // Toggle sort column/direction for a section
+        function toggleSort(key, column) {
+            const current = sortConfig[key] || { column: 'total', dir: 'desc' };
+            if (current.column === column) {
+                sortConfig[key] = { column, dir: current.dir === 'desc' ? 'asc' : 'desc' };
+            } else {
+                // String columns default to ascending, numeric columns to descending
+                const isStringColumn = column === 'merchant' || column === 'subcategory';
+                sortConfig[key] = { column, dir: isStringColumn ? 'asc' : 'desc' };
             }
         }
 
@@ -963,7 +1077,7 @@ createApp({
             // State
             activeFilters, expandedMerchants, collapsedSections, searchQuery,
             showAutocomplete, autocompleteIndex, isScrolled, isDarkTheme, chartsCollapsed, helpCollapsed,
-            showIncome, showTransfers, currentView,
+            showIncome, showTransfers, currentView, sortConfig,
             // Refs
             monthlyChart, categoryPieChart, categoryByMonthChart,
             // Computed
@@ -971,13 +1085,14 @@ createApp({
             visibleSections, filteredCategoryView, filteredSectionView, hasSections,
             sectionTotals, grandTotal, uncategorizedTotal,
             numFilteredMonths, filteredAutocomplete, availableMonths,
+            categoryColorMap,
             // Cash flow
             incomeTotal, incomeCount, groupedIncome, expandedIncome,
             transfersTotal, transfersCount, groupedTransfers, expandedTransfers,
             netCashFlow,
             // Methods
             addFilter, removeFilter, toggleFilterMode, clearFilters, addMonthFilter,
-            toggleExpand, toggleSection, sortedMerchants,
+            toggleExpand, toggleSection, toggleSort, sortedMerchants,
             formatCurrency, formatDate, formatMonthLabel, formatPct, filterTypeChar, getLocationClass,
             onSearchInput, onSearchKeydown, selectAutocompleteItem,
             toggleTheme, scrollToIncome, scrollToTransfers
