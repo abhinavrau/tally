@@ -158,6 +158,66 @@ Patterns are Python regex (case-insensitive). First match wins.
 - `[amount>200]`, `[amount:50-100]` - Amount conditions
 - `[date=2025-01-15]`, `[month=12]` - Date conditions
 
+### sections.sections (Optional)
+
+Define custom spending views using filter expressions. Create `config/sections.sections`:
+
+```
+[Every Month]
+description: Consistent recurring (rent, utilities, subscriptions)
+filter: months >= 6 and cv < 0.3
+
+[Variable Recurring]
+description: Frequent but inconsistent (groceries, shopping)
+filter: months >= 6 and cv >= 0.3
+
+[Periodic]
+description: Quarterly or semi-annual (tuition, insurance)
+filter: months >= 2 and months <= 5
+
+[Large Purchases]
+description: Big one-time expenses
+filter: total > 1000 and months <= 2
+
+[Tagged: Business]
+description: Business expenses
+filter: "business" in tags
+```
+
+**Primitives:**
+| Name | Type | Description |
+|------|------|-------------|
+| `months` | int | Unique months with transactions |
+| `total` | float | Sum of all payments |
+| `cv` | float | Coefficient of variation (0 = consistent, >0.3 = variable) |
+| `category` | str | Category (e.g., "Food") |
+| `subcategory` | str | Subcategory (e.g., "Grocery") |
+| `tags` | set | Tag strings from merchant rules |
+| `payments` | list | All payment amounts |
+
+**Advanced filter examples:**
+```
+# High-value inconsistent spending
+filter: total > 5000 and cv >= 0.5
+
+# Subscription-like (consistent, 6+ months)
+filter: cv < 0.2 and months >= 6 and avg(payments) < 100
+
+# Large single transactions
+filter: max(payments) > 2000 and count(payments) <= 3
+
+# Specific categories with thresholds
+filter: category == "Food" and total > 500 and months >= 3
+
+# Tag-based with amount filter
+filter: "recurring" in tags and avg(payments) > 50
+
+# Combine multiple conditions
+filter: (category == "Shopping" or category == "Food") and cv >= 0.4
+```
+
+Sections can overlap - the same merchant can appear in multiple sections.
+
 ## For AI Agents
 
 Run `tally workflow` at any time to see context-aware instructions:

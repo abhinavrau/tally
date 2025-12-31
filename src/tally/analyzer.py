@@ -1247,7 +1247,7 @@ def print_sections_summary(stats, year=2025, currency_format="${amount}", only_f
     sections_config = stats.get('_sections_config')
 
     if not sections:
-        print("No sections defined. Add sections to config/sections.txt")
+        print("No sections defined. Add sections to config/sections.sections")
         return
 
     # Get the order of sections from config
@@ -1396,7 +1396,7 @@ def write_summary_file_vue(stats, filepath, year=2025, home_locations=None, curr
 
     sections = {}
 
-    # Use user-defined sections from sections.txt
+    # Use user-defined sections from sections.sections
     user_sections = stats.get('sections')
     sections_config = stats.get('_sections_config')
 

@@ -8,7 +8,7 @@ import os
 
 from .format_parser import parse_format_string, is_special_parser_type, get_account_type_settings
 from .classification_rules import load_rules, get_default_rules, write_default_rules, get_default_rules_parsed
-from .section_engine import load_sections, get_default_sections_parsed, write_default_sections, SectionParseError
+from .section_engine import load_sections, SectionParseError
 
 # Try to import yaml, fall back to simple parsing if not available
 try:
@@ -270,26 +270,37 @@ def load_config(config_dir, settings_file='settings.yaml'):
         config['_rules_file'] = rules_file
         # Don't warn - this is expected on first run
 
-    # Load section definitions
-    sections_file = os.path.join(config_dir, 'sections.txt')
-    if os.path.exists(sections_file):
-        try:
-            config['sections'] = load_sections(sections_file)
-            config['_sections_file'] = sections_file
-        except SectionParseError as e:
+    # Load section definitions (optional - sections_file in settings.yaml)
+    sections_file = config.get('sections_file')
+    if sections_file:
+        # Resolve path relative to config directory's parent (budget directory)
+        budget_dir = os.path.dirname(config_dir)
+        sections_path = os.path.join(budget_dir, sections_file)
+        if os.path.exists(sections_path):
+            try:
+                config['sections'] = load_sections(sections_path)
+                config['_sections_file'] = sections_path
+            except SectionParseError as e:
+                warnings.append({
+                    'type': 'error',
+                    'source': sections_file,
+                    'message': f"Error loading sections: {e}",
+                    'suggestion': f"Fix the syntax error in {sections_file}",
+                })
+                config['sections'] = None
+                config['_sections_file'] = None
+        else:
             warnings.append({
-                'type': 'error',
-                'source': 'sections.txt',
-                'message': f"Error loading sections: {e}",
-                'suggestion': "Fix the syntax error or delete the file to regenerate defaults.",
+                'type': 'warning',
+                'source': 'settings.yaml',
+                'message': f"Sections file not found: {sections_file}",
+                'suggestion': f"Create {sections_file} or remove sections_file from settings.yaml",
             })
-            config['sections'] = get_default_sections_parsed()
+            config['sections'] = None
             config['_sections_file'] = None
     else:
-        # Create default sections file
-        write_default_sections(sections_file)
-        config['sections'] = get_default_sections_parsed()
-        config['_sections_file'] = sections_file
-        # Don't warn - this is expected on first run
+        # No sections_file configured - sections feature is optional
+        config['sections'] = None
+        config['_sections_file'] = None
 
     return config

@@ -192,6 +192,10 @@ data_sources:
 output_dir: output
 html_filename: spending_summary.html
 
+# Sections file (optional) - custom spending views
+# Create config/sections.sections and uncomment:
+# sections_file: config/sections.sections
+
 # Home locations (auto-detected if not specified)
 # Transactions outside these locations are classified as travel
 # home_locations:
@@ -236,6 +240,76 @@ STARTER_MERCHANT_CATEGORIES = '''# Merchant Categorization Rules
 Pattern,Merchant,Category,Subcategory
 
 # Add your custom rules below:
+
+'''
+
+STARTER_SECTIONS = '''# Tally Sections Configuration (.sections format)
+#
+# Sections define views into your spending data.
+# Each merchant is evaluated against all section filters.
+# Sections can overlap - the same merchant can appear in multiple sections.
+#
+# SYNTAX:
+#   [Section Name]
+#   description: Human-readable description (optional)
+#   filter: <expression>
+#
+# PRIMITIVES:
+#   months      - count of unique months with transactions
+#   total       - sum of all payments
+#   cv          - coefficient of variation of monthly totals (0 = very consistent)
+#   category    - category string (e.g., "Food", "Travel")
+#   subcategory - subcategory string (e.g., "Grocery", "Airline")
+#   merchant    - merchant name
+#   tags        - set of tag strings
+#   payments    - list of payment amounts
+#
+# FUNCTIONS:
+#   sum(payments), count(payments), avg(payments)
+#   min(payments), max(payments), stddev(payments)
+#   abs(x), round(x)
+#
+# OPERATORS:
+#   Comparison: ==  !=  <  <=  >  >=
+#   Boolean:    and  or  not
+#   Membership: "tag" in tags
+#   Arithmetic: +  -  *  /  %
+#
+# ============================================================================
+# SAMPLE SECTIONS (uncomment and customize)
+# ============================================================================
+
+# [Every Month]
+# description: Consistent recurring expenses (rent, utilities, subscriptions)
+# filter: months >= 6 and cv < 0.3
+
+# [Variable Recurring]
+# description: Frequent but inconsistent (groceries, shopping, delivery)
+# filter: months >= 6 and cv >= 0.3
+
+# [Periodic]
+# description: Quarterly or semi-annual (tuition, insurance)
+# filter: months >= 2 and months <= 5
+
+# [Travel]
+# description: All travel expenses
+# filter: category == "Travel"
+
+# [Large Purchases]
+# description: Big one-time expenses over $1,000
+# filter: total > 1000 and months <= 3
+
+# [Food & Dining]
+# description: All food-related spending
+# filter: category == "Food"
+
+# [Subscriptions]
+# description: Streaming, software, memberships
+# filter: category == "Subscriptions"
+
+# [Tagged: Business]
+# description: Business expenses for reimbursement
+# filter: "business" in tags
 
 '''
 
@@ -460,6 +534,15 @@ def init_config(target_dir):
         files_created.append('config/merchant_categories.csv')
     else:
         files_skipped.append('config/merchant_categories.csv')
+
+    # Write sections.sections
+    sections_path = os.path.join(config_dir, 'sections.sections')
+    if not os.path.exists(sections_path):
+        with open(sections_path, 'w', encoding='utf-8') as f:
+            f.write(STARTER_SECTIONS)
+        files_created.append('config/sections.sections')
+    else:
+        files_skipped.append('config/sections.sections')
 
     # Create .gitignore for data privacy
     gitignore_path = os.path.join(target_dir, '.gitignore')
@@ -1597,30 +1680,45 @@ def cmd_diag(args):
     # Sections configuration
     print("SECTIONS")
     print("-" * 70)
-    sections_file = os.path.join(config_dir, 'sections.txt')
-    print(f"Sections file: {sections_file}")
-    print(f"  Exists: {os.path.exists(sections_file)}")
-    if os.path.exists(sections_file):
-        try:
-            from .section_engine import load_sections
-            sections_config = load_sections(sections_file)
-            print(f"  Sections defined: {len(sections_config.sections)}")
-            if sections_config.global_variables:
+    sections_file_setting = config.get('sections_file') if config else None
+    if sections_file_setting:
+        # Resolve path relative to budget directory (parent of config dir)
+        budget_dir = os.path.dirname(config_dir)
+        sections_path = os.path.join(budget_dir, sections_file_setting)
+        print(f"Configured in settings.yaml: {sections_file_setting}")
+        print(f"  Resolved path: {sections_path}")
+        print(f"  Exists: {os.path.exists(sections_path)}")
+        if os.path.exists(sections_path):
+            try:
+                from .section_engine import load_sections
+                sections_config = load_sections(sections_path)
+                print(f"  Sections defined: {len(sections_config.sections)}")
+                if sections_config.global_variables:
+                    print()
+                    print("  Global variables:")
+                    for name, expr in sections_config.global_variables.items():
+                        print(f"    {name} = {expr}")
                 print()
-                print("  Global variables:")
-                for name, expr in sections_config.global_variables.items():
-                    print(f"    {name} = {expr}")
+                print("  Sections:")
+                for section in sections_config.sections:
+                    print(f"    [{section.name}]")
+                    if section.description:
+                        print(f"      description: {section.description}")
+                    print(f"      filter: {section.filter_expr}")
+            except Exception as e:
+                print(f"  Error loading sections: {e}")
+        else:
             print()
-            print("  Sections:")
-            for section in sections_config.sections:
-                print(f"    [{section.name}]")
-                if section.description:
-                    print(f"      description: {section.description}")
-                print(f"      filter: {section.filter_expr}")
-        except Exception as e:
-            print(f"  Error loading sections: {e}")
+            print("  WARNING: Sections file not found!")
+            print(f"  Create {sections_file_setting} or remove sections_file from settings.yaml")
     else:
-        print("  Not found - will be created with defaults on first 'tally run'")
+        print("Not configured (optional)")
+        print("  To enable sections, add to settings.yaml:")
+        print("    sections_file: config/sections.sections")
+        print()
+        print("  Then create the file with section definitions. Example:")
+        print("    [Every Month]")
+        print("    filter: months >= 6 and cv < 0.3")
     print()
 
     # JSON output option
@@ -1818,6 +1916,19 @@ def cmd_workflow(args):
 
     print()
     print(f"  {C.DIM}First match wins — put specific patterns before general ones{C.RESET}")
+
+    section("Sections (Optional)")
+    print(f"    {C.DIM}Create custom spending views with {C.RESET}{C.CYAN}config/sections.sections{C.RESET}")
+    print()
+    print(f"    {C.DIM}[Every Month]")
+    print(f"    description: Consistent recurring expenses")
+    print(f"    filter: months >= 6 and cv < 0.3")
+    print()
+    print(f"    [Large Purchases]")
+    print(f"    filter: total > 1000 and months <= 2{C.RESET}")
+    print()
+    print(f"    {C.DIM}Primitives: months, total, cv, category, subcategory, tags, payments{C.RESET}")
+    print(f"    {C.DIM}Functions: sum(), avg(), count(), min(), max(), stddev(){C.RESET}")
     print()
 
 
@@ -1988,7 +2099,7 @@ def cmd_explain(args):
 
     # Load sections config for section matching
     sections_config = None
-    sections_file = os.path.join(config_dir, 'sections.txt')
+    sections_file = os.path.join(config_dir, 'sections.sections')
     if os.path.exists(sections_file):
         try:
             from .section_engine import load_sections
@@ -2117,7 +2228,7 @@ def cmd_explain(args):
                 merchants_dict = {name: data for name, data in merchants_list}
                 _print_classification_summary(section_match, merchants_dict, verbose, stats['num_months'])
         else:
-            print("No sections.txt found. Run 'tally run' first to generate default sections.")
+            print("No sections.sections found. Run 'tally run' first to generate default sections.")
             sys.exit(1)
 
     elif args.category:
