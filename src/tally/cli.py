@@ -2666,9 +2666,30 @@ def cmd_reference(args):
   {C.DIM}All tags are lowercased for consistency.{C.RESET}
 """)
 
+        section("Tag-Only Rules")
+        print(f"""
+  Rules without {C.GREEN}category:{C.RESET} add tags without affecting categorization:
+
+  {C.DIM}[Large Purchase]{C.RESET}
+  {C.DIM}match: amount > 500{C.RESET}
+  {C.DIM}tags: large, review{C.RESET}              {C.DIM}# No category - just adds tags{C.RESET}
+
+  {C.DIM}[Holiday Season]{C.RESET}
+  {C.DIM}match: month >= 11 and month <= 12{C.RESET}
+  {C.DIM}tags: holiday{C.RESET}
+
+  {C.BOLD}Two-pass matching:{C.RESET}
+  1. First rule with {C.GREEN}category:{C.RESET} sets merchant/category/subcategory
+  2. Tags are collected from {C.BOLD}ALL{C.RESET} matching rules
+
+  Example: A $600 Netflix charge in December gets:
+  • Category from Netflix rule (Subscriptions)
+  • Tags: entertainment + large + review + holiday
+""")
+
         section("Rule Priority")
         print(f"""
-  {C.BOLD}First match wins{C.RESET} — put specific patterns before general ones:
+  {C.BOLD}First categorization rule wins{C.RESET} — put specific patterns before general:
 
   {C.DIM}[Uber Eats]                    # ← More specific, checked first{C.RESET}
   {C.DIM}match: contains("UBER EATS"){C.RESET}
@@ -2678,7 +2699,7 @@ def cmd_reference(args):
   {C.DIM}match: contains("UBER"){C.RESET}
   {C.DIM}category: Transportation{C.RESET}
 
-  {C.BOLD}Tags accumulate{C.RESET} — if multiple rules could match, use 'and' with 'not':
+  {C.BOLD}Tags accumulate{C.RESET} from all matching rules. Use 'and not' if needed:
   {C.DIM}match: contains("UBER") and not contains("EATS"){C.RESET}
 """)
 
