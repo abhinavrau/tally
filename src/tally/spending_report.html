@@ -462,7 +462,7 @@
                                               @click.stop="addFilter(tag, 'tag')">{{ tag }}</span>
                                     </td>
                                     <td>{{ group.count }}</td>
-                                    <td class="money" :class="{ 'income-amount': group.tags && group.tags.includes('income') }">
+                                    <td class="money" :class="{ 'income-amount': group.tags && group.tags.includes('income'), 'negative-amount': group.total < 0 && !(group.tags && group.tags.includes('income')) }">
                                         {{ group.tags && group.tags.includes('income') ? '+' + formatCurrency(Math.abs(group.total)) : formatCurrency(group.total) }}
                                     </td>
                                 </tr>
@@ -475,7 +475,7 @@
                                             <span class="txn-date">{{ formatDate(txn.date) }}</span>
                                             <span class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span>
                                             <span class="txn-desc">{{ txn.description }}</span>
-                                            <span class="txn-amount" :class="{ 'income-amount': txn.tags && txn.tags.includes('income') }">
+                                            <span class="txn-amount" :class="{ 'income-amount': txn.tags && txn.tags.includes('income'), 'negative-amount': txn.amount < 0 && !(txn.tags && txn.tags.includes('income')) }">
                                                 {{ txn.tags && txn.tags.includes('income') ? '+' + formatCurrency(Math.abs(txn.amount)) : formatCurrency(txn.amount) }}
                                             </span>
                                         </div>

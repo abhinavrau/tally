@@ -1123,6 +1123,9 @@ section:nth-child(5) { animation-delay: 0.4s; }
 .income-amount {
     color: var(--accent-green) !important;
 }
+.negative-amount {
+    color: var(--accent-red, #e74c3c) !important;
+}
 
 /* Credits Section */
 .credits-section {
@@ -1135,6 +1138,36 @@ section:nth-child(5) { animation-delay: 0.4s; }
     color: var(--accent-green) !important;
 }
 .credit-label {
+    color: var(--accent-green);
+}
+
+/* Excluded Section */
+.excluded-section {
+    margin-top: 2rem;
+    opacity: 0.85;
+}
+.excluded-section:hover {
+    opacity: 1;
+}
+.excluded-section .section-header h2 {
+    color: var(--text-muted);
+}
+.excluded-section .section-pct {
+    color: var(--text-muted);
+    font-style: italic;
+}
+.excluded-section table {
+    opacity: 0.9;
+}
+.excluded-section .merchant-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+.excluded-section .tag-badge {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+}
+.excluded-section .tag-badge[class*="income"] {
+    background: rgba(46, 204, 113, 0.2);
     color: var(--accent-green);
 }
 

@@ -801,6 +801,9 @@ createApp({
         function formatCurrency(amount) {
             if (amount === undefined || amount === null) return '$0';
             const rounded = Math.round(amount);
+            if (rounded < 0) {
+                return '-$' + Math.abs(rounded).toLocaleString('en-US');
+            }
             return '$' + rounded.toLocaleString('en-US');
         }
 
