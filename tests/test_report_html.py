@@ -458,11 +458,12 @@ class TestEdgeCasesAndCalculations:
         expect(page.get_by_test_id("transfers-amount")).to_contain_text("$500")
 
     def test_cash_flow_calculation(self, page: Page, edge_case_report_path):
-        """Net cash flow = income - spending - transfers."""
+        """Net cash flow = income - spending (transfers excluded, they just move money)."""
         page.goto(f"file://{edge_case_report_path}")
-        # Cash flow: $3,000 - $2,100 - $500 = $400
+        # Cash flow: $3,000 - $2,100 = $900
         # Note: spending is net of refunds ($2,250 - $150 = $2,100)
-        expect(page.get_by_test_id("cashflow-amount")).to_contain_text("$400")
+        # Transfers are excluded since they just move money between accounts
+        expect(page.get_by_test_id("cashflow-amount")).to_contain_text("$900")
 
     # -------------------------------------------------------------------------
     # Excluded Transaction Tests

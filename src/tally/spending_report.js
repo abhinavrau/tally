@@ -741,9 +741,9 @@ createApp({
         });
         const transfersCount = computed(() => transferTransactions.value.length);
 
-        // Net cash flow
+        // Net cash flow (Income - Spending; transfers excluded since they just move money between accounts)
         const netCashFlow = computed(() => {
-            return Math.abs(incomeTotal.value) - grandTotal.value - Math.abs(transfersTotal.value);
+            return Math.abs(incomeTotal.value) - grandTotal.value;
         });
 
         // Group transactions by merchant helper (returns unsorted)
