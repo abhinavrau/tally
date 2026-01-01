@@ -11,7 +11,7 @@ uv run tally run --format json -v /path/to/config  # JSON output with reasoning
 uv run tally explain /path/to/config               # Classification summary
 uv run tally explain Netflix /path/to/config       # Explain specific merchant
 uv run tally explain Netflix -vv /path/to/config   # Full details + which rule matched
-uv run tally explain -c monthly /path/to/config    # Explain all monthly merchants
+uv run tally explain --category Food /path/to/config  # Explain all Food category merchants
 uv run tally explain --tags business /path/to/config  # Explain business-tagged merchants
 uv run tally diag /path/to/config # Debug config issues (shows tag stats)
 uv run tally discover /path/to/config # Find unknown merchants

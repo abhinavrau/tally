@@ -1041,11 +1041,19 @@ def main():
     )
     explain_parser.add_argument(
         '--category',
-        help='Filter to specific category'
+        help='Filter to specific category (e.g., --category Food)'
     )
     explain_parser.add_argument(
         '--tags',
         help='Filter by tags (comma-separated, e.g., --tags business,reimbursable)'
+    )
+    explain_parser.add_argument(
+        '--month',
+        help='Filter to specific month (e.g., --month 2024-12 or --month Dec)'
+    )
+    explain_parser.add_argument(
+        '--location',
+        help='Filter by transaction location (e.g., --location "New York")'
     )
     explain_parser.add_argument(
         '--amount', '-a',

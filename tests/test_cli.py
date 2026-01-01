@@ -149,7 +149,7 @@ data_sources:
                 capture_output=True,
                 text=True
             )
-            assert "No merchants found in category 'NonExistent'" in result.stdout
+            assert "No merchants found matching: category:NonExistent" in result.stdout
             assert 'Available categories:' in result.stdout
 
     def test_invalid_format_shows_choices(self):
@@ -347,5 +347,98 @@ data_sources:
             )
             # Should succeed and create merchants.rules
             assert os.path.exists(os.path.join(config_dir, 'merchants.rules'))
+
+
+class TestMonthFilter:
+    """Tests for the --month filter parsing logic."""
+
+    def test_yyyy_mm_format_passes_through(self):
+        """YYYY-MM format should be returned as-is."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('2025-02', available) == '2025-02'
+        # Even if not in available, YYYY-MM passes through
+        assert _parse_month_filter('2024-12', available) == '2024-12'
+
+    def test_month_name_single_match(self):
+        """Month name with single year match should find it."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('Jan', available) == '2025-01'
+        assert _parse_month_filter('feb', available) == '2025-02'
+        assert _parse_month_filter('MARCH', available) == '2025-03'
+
+    def test_month_name_multiple_years_picks_most_recent(self):
+        """Month name appearing in multiple years should pick most recent."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2024-03', '2025-03', '2023-03'}
+        assert _parse_month_filter('Mar', available) == '2025-03'
+        assert _parse_month_filter('march', available) == '2025-03'
+
+    def test_month_name_no_match_returns_none(self):
+        """Month name not in data should return None."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('Dec', available) is None
+        assert _parse_month_filter('december', available) is None
+
+    def test_month_number_single_digit(self):
+        """Single digit month numbers should work."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('1', available) == '2025-01'
+        assert _parse_month_filter('2', available) == '2025-02'
+        assert _parse_month_filter('3', available) == '2025-03'
+
+    def test_month_number_double_digit(self):
+        """Double digit month numbers should work."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-10', '2025-11', '2025-12'}
+        assert _parse_month_filter('10', available) == '2025-10'
+        assert _parse_month_filter('11', available) == '2025-11'
+        assert _parse_month_filter('12', available) == '2025-12'
+
+    def test_month_number_invalid(self):
+        """Invalid month numbers should return None."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('0', available) is None
+        assert _parse_month_filter('13', available) is None
+        assert _parse_month_filter('-1', available) is None
+
+    def test_month_number_multiple_years(self):
+        """Month number appearing in multiple years should pick most recent."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2024-01', '2025-01'}
+        assert _parse_month_filter('1', available) == '2025-01'
+
+    def test_empty_available_months(self):
+        """Empty available months should return None for names/numbers."""
+        from tally.commands.explain import _parse_month_filter
+        available = set()
+        assert _parse_month_filter('Jan', available) is None
+        assert _parse_month_filter('1', available) is None
+        # YYYY-MM still passes through
+        assert _parse_month_filter('2025-01', available) == '2025-01'
+
+    def test_invalid_input(self):
+        """Random strings should return None."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01', '2025-02', '2025-03'}
+        assert _parse_month_filter('foo', available) is None
+        assert _parse_month_filter('', available) is None
+        assert _parse_month_filter('2025', available) is None
+        assert _parse_month_filter('01-2025', available) is None
+
+    def test_case_insensitivity(self):
+        """Month names should be case-insensitive."""
+        from tally.commands.explain import _parse_month_filter
+        available = {'2025-01'}
+        assert _parse_month_filter('jan', available) == '2025-01'
+        assert _parse_month_filter('JAN', available) == '2025-01'
+        assert _parse_month_filter('Jan', available) == '2025-01'
+        assert _parse_month_filter('JANUARY', available) == '2025-01'
+        assert _parse_month_filter('january', available) == '2025-01'
+        assert _parse_month_filter('January', available) == '2025-01'
 
 

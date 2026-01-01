@@ -366,18 +366,52 @@ def export_json(stats, verbose=0, category_filter=None, merchant_filter=None):
     """
     import json
 
+    by_merchant = stats.get('by_merchant', {})
+    by_month = stats.get('by_month', {})
+    by_category = stats.get('by_category', {})
+    excluded_transactions = stats.get('excluded_transactions', [])
+
+    # Calculate gross spending and credits
+    gross_spending = sum(d['total'] for d in by_merchant.values() if d['total'] > 0)
+    credits_total = abs(sum(d['total'] for d in by_merchant.values() if d['total'] < 0))
+
+    # Calculate income and transfers
+    income_total = abs(sum(t['amount'] for t in excluded_transactions
+                          if 'income' in [tag.lower() for tag in t.get('tags', [])]))
+    transfers_total = abs(sum(t['amount'] for t in excluded_transactions
+                              if 'transfer' in [tag.lower() for tag in t.get('tags', [])]))
+
     output = {
         'summary': {
             'total_spending': round(stats['total'], 2),
+            'gross_spending': round(gross_spending, 2),
+            'credits_total': round(credits_total, 2),
             'monthly_budget': round(stats['monthly_avg'], 2),
             'num_months': stats['num_months'],
+            'income_total': round(income_total, 2),
+            'transfers_total': round(transfers_total, 2),
+            'net_cash_flow': round(income_total - stats['total'] - transfers_total, 2) if income_total > 0 else None,
         },
+        'by_month': {month: {'total': round(data['total'], 2), 'count': data['count']}
+                     for month, data in sorted(by_month.items())},
+        'by_category': [
+            {
+                'category': cat,
+                'subcategory': subcat,
+                'total': round(data['total'], 2),
+                'percentage': round(data['total'] / gross_spending * 100, 1) if gross_spending > 0 else 0
+            }
+            for (cat, subcat), data in sorted(by_category.items(), key=lambda x: x[1]['total'], reverse=True)
+            if data['total'] > 0
+        ],
+        'credits': [
+            {'merchant': name, 'category': data.get('category', ''), 'amount': round(abs(data['total']), 2)}
+            for name, data in by_merchant.items() if data['total'] < 0
+        ],
         'merchants': []
     }
 
-    by_merchant = stats.get('by_merchant', {})
     merchants = []
-
     for name, data in by_merchant.items():
         # Apply filters
         if category_filter and data.get('category') != category_filter:
@@ -405,21 +439,84 @@ def export_markdown(stats, verbose=0, category_filter=None, merchant_filter=None
 
     Returns: Markdown string
     """
+    by_merchant = stats.get('by_merchant', {})
+    by_month = stats.get('by_month', {})
+    by_category = stats.get('by_category', {})
+    excluded_transactions = stats.get('excluded_transactions', [])
+
+    # Calculate gross spending and credits
+    gross_spending = sum(d['total'] for d in by_merchant.values() if d['total'] > 0)
+    credits_total = abs(sum(d['total'] for d in by_merchant.values() if d['total'] < 0))
+
+    # Calculate income and transfers
+    income_total = abs(sum(t['amount'] for t in excluded_transactions
+                          if 'income' in [tag.lower() for tag in t.get('tags', [])]))
+    transfers_total = abs(sum(t['amount'] for t in excluded_transactions
+                              if 'transfer' in [tag.lower() for tag in t.get('tags', [])]))
+
     lines = ['# Spending Analysis\n']
 
     # Summary
     lines.append('## Summary\n')
     lines.append(f"- **Monthly Budget:** ${stats['monthly_avg']:.2f}/mo")
     lines.append(f"- **Total Spending (YTD):** ${stats['total']:.2f}")
+    if credits_total > 0:
+        lines.append(f"- **Credits/Refunds:** +${credits_total:.2f}")
+        lines.append(f"- **Gross Spending:** ${gross_spending:.2f}")
     lines.append(f"- **Data Period:** {stats['num_months']} months\n")
 
-    lines.append("\n## Merchants\n")
+    # Cash Flow
+    if income_total > 0:
+        lines.append('## Cash Flow\n')
+        lines.append(f"| Item | Amount |")
+        lines.append(f"|------|--------|")
+        lines.append(f"| Income | +${income_total:,.2f} |")
+        lines.append(f"| Spending | -${stats['total']:,.2f} |")
+        if transfers_total > 0:
+            lines.append(f"| Transfers | -${transfers_total:,.2f} |")
+        net = income_total - stats['total'] - transfers_total
+        sign = '+' if net >= 0 else ''
+        lines.append(f"| **Net Cash Flow** | **{sign}${net:,.2f}** |")
+        lines.append('')
 
-    by_merchant = stats.get('by_merchant', {})
+    # Monthly Breakdown
+    if by_month:
+        lines.append('## Monthly Breakdown\n')
+        lines.append('| Month | Spending | Transactions |')
+        lines.append('|-------|----------|--------------|')
+        for month in sorted(by_month.keys()):
+            data = by_month[month]
+            lines.append(f"| {month} | ${data['total']:,.2f} | {data['count']} |")
+        lines.append('')
 
-    # Sort by monthly value
+    # Credits/Refunds
+    credit_merchants = [(m, d) for m, d in by_merchant.items() if d['total'] < 0]
+    if credit_merchants:
+        lines.append('## Credits/Refunds\n')
+        lines.append('| Merchant | Category | Amount |')
+        lines.append('|----------|----------|--------|')
+        for name, data in sorted(credit_merchants, key=lambda x: x[1]['total']):
+            lines.append(f"| {name} | {data.get('category', '')} | +${abs(data['total']):,.2f} |")
+        lines.append(f"| **Total** | | **+${credits_total:,.2f}** |")
+        lines.append('')
+
+    # By Category
+    lines.append('## By Category\n')
+    lines.append('| Category | Subcategory | YTD | % |')
+    lines.append('|----------|-------------|-----|---|')
+    positive_cats = [(k, v) for k, v in by_category.items() if v['total'] > 0]
+    for (cat, subcat), data in sorted(positive_cats, key=lambda x: x[1]['total'], reverse=True)[:15]:
+        pct = (data['total'] / gross_spending * 100) if gross_spending > 0 else 0
+        lines.append(f"| {cat} | {subcat} | ${data['total']:,.2f} | {pct:.1f}% |")
+    lines.append('')
+
+    # Merchants
+    lines.append("## Merchants\n")
+
+    # Sort by monthly value (positive merchants only)
+    positive_merchants = [(m, d) for m, d in by_merchant.items() if d['total'] > 0]
     sorted_merchants = sorted(
-        by_merchant.items(),
+        positive_merchants,
         key=lambda x: x[1].get('monthly_value', 0),
         reverse=True
     )
@@ -466,9 +563,24 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
 
     by_category = stats['by_category']
     by_merchant = stats.get('by_merchant', {})
+    by_month = stats.get('by_month', {})
+    excluded_transactions = stats.get('excluded_transactions', [])
 
     # Calculate actual spending (transactions tagged income/transfer already excluded)
     actual_spending = sum(data['total'] for (cat, sub), data in by_category.items())
+
+    # Calculate gross spending (positive merchants only) and credits (negative merchants)
+    gross_spending = sum(d['total'] for d in by_merchant.values() if d['total'] > 0)
+    credits_total = abs(sum(d['total'] for d in by_merchant.values() if d['total'] < 0))
+
+    # Calculate income and transfers from excluded transactions
+    income_total = abs(sum(t['amount'] for t in excluded_transactions
+                          if 'income' in [tag.lower() for tag in t.get('tags', [])]))
+    transfers_total = abs(sum(t['amount'] for t in excluded_transactions
+                              if 'transfer' in [tag.lower() for tag in t.get('tags', [])]))
+
+    # Net cash flow: income - spending - transfers
+    net_cash_flow = income_total - actual_spending - transfers_total if income_total > 0 else None
 
     # =========================================================================
     # SPENDING SUMMARY
@@ -481,14 +593,62 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
     print("-" * 50)
     print(f"Monthly Average:             {fmt(stats['monthly_avg']):>14}/mo")
     print(f"Total Spending (YTD):        {fmt(actual_spending):>14}")
+    if credits_total > 0:
+        print(f"Credits/Refunds:            +{fmt(credits_total):>14}")
+        print(f"Gross Spending:              {fmt(gross_spending):>14}")
     print(f"Merchants:                   {len(by_merchant):>14}")
 
-    # Show excluded transactions info
-    excluded_count = stats.get('excluded_count', 0)
-    excluded_total = stats.get('excluded_total', 0)
-    if excluded_count > 0:
+    # =========================================================================
+    # CASH FLOW (if income exists)
+    # =========================================================================
+    if income_total > 0:
+        print("\n" + "=" * 80)
+        print("CASH FLOW")
+        print("=" * 80)
+        print(f"\nIncome:                     +{fmt(income_total):>14}")
+        print(f"Spending:                   -{fmt(actual_spending):>14}")
+        if transfers_total > 0:
+            print(f"Transfers:                  -{fmt(transfers_total):>14}")
+        print("-" * 50)
+        sign = '+' if net_cash_flow >= 0 else ''
+        print(f"Net Cash Flow:              {sign}{fmt(net_cash_flow):>14}")
+    elif stats.get('excluded_count', 0) > 0:
+        # Show excluded info if no income
         print()
-        print(f"Excluded (income/transfer):  {fmt(excluded_total):>14}  ({excluded_count} transactions)")
+        excluded_total = stats.get('excluded_total', 0)
+        print(f"Excluded (income/transfer):  {fmt(excluded_total):>14}  ({stats['excluded_count']} transactions)")
+
+    # =========================================================================
+    # CREDITS/REFUNDS (if any negative totals)
+    # =========================================================================
+    credit_merchants = [(m, d) for m, d in by_merchant.items() if d['total'] < 0]
+    if credit_merchants:
+        print("\n" + "=" * 80)
+        print("CREDITS/REFUNDS")
+        print("=" * 80)
+        print(f"\n{'Merchant':<30} {'Category':<20} {'Amount':>14}")
+        print("-" * 68)
+        for merchant, data in sorted(credit_merchants, key=lambda x: x[1]['total']):
+            category = data.get('category', 'Unknown')[:20]
+            print(f"{merchant:<30} {category:<20} +{fmt(abs(data['total'])):>14}")
+        print(f"\n{'TOTAL CREDITS':<30} {'':<20} +{fmt(credits_total):>14}")
+
+    # =========================================================================
+    # MONTHLY BREAKDOWN
+    # =========================================================================
+    if by_month:
+        print("\n" + "=" * 80)
+        print("MONTHLY BREAKDOWN")
+        print("=" * 80)
+        print(f"\n{'Month':<12} {'Spending':>14} {'Transactions':>14}")
+        print("-" * 44)
+        for month in sorted(by_month.keys()):
+            data = by_month[month]
+            month_label = month  # Format: "2024-01"
+            print(f"{month_label:<12} {fmt(data['total']):>14} {data['count']:>14}")
+        avg_monthly = actual_spending / len(by_month) if by_month else 0
+        print("-" * 44)
+        print(f"{'AVERAGE':<12} {fmt(avg_monthly):>14}/mo")
 
     # =========================================================================
     # TOP MERCHANTS BY SPENDING
@@ -499,8 +659,10 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
     print(f"\n{'Merchant':<28} {'Category':<18} {'Mo':>3} {'Monthly':>12} {'YTD':>14}")
     print("-" * 80)
 
+    # Only show positive-total merchants here (credits shown separately)
+    positive_merchants = [(m, d) for m, d in by_merchant.items() if d['total'] > 0]
     sorted_merchants = sorted(
-        by_merchant.items(),
+        positive_merchants,
         key=lambda x: x[1].get('total', 0),
         reverse=True
     )
@@ -517,19 +679,22 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
     print(f"\n{'TOTAL':<28} {'':<18} {'':<3} {fmt(stats['monthly_avg']):>12}/mo {fmt(actual_spending):>14}")
 
     # =========================================================================
-    # BY CATEGORY
+    # BY CATEGORY (with percentages)
     # =========================================================================
     print("\n" + "=" * 80)
     print("BY CATEGORY")
     print("=" * 80)
-    print(f"\n{'Category':<20} {'Subcategory':<18} {'YTD':>14}")
-    print("-" * 56)
+    print(f"\n{'Category':<20} {'Subcategory':<16} {'YTD':>12} {'%':>8}")
+    print("-" * 60)
 
-    sorted_cats = sorted(by_category.items(), key=lambda x: x[1]['total'], reverse=True)
+    # Only show positive categories (credits shown separately above)
+    positive_cats = [(k, v) for k, v in by_category.items() if v['total'] > 0]
+    sorted_cats = sorted(positive_cats, key=lambda x: x[1]['total'], reverse=True)
     for (cat, subcat), data in sorted_cats[:20]:
         if filter_category and cat.lower() != filter_category.lower():
             continue
-        print(f"{cat:<20} {subcat:<18} {fmt(data['total']):>14}")
+        pct = (data['total'] / gross_spending * 100) if gross_spending > 0 else 0
+        print(f"{cat:<20} {subcat:<16} {fmt(data['total']):>12} {pct:>7.1f}%")
 
 
 def print_sections_summary(stats, year=2025, currency_format="${amount}", only_filter=None):

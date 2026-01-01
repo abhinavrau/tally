@@ -204,7 +204,7 @@ def cmd_workflow(args):
     print(f"    {C.BOLD}8. Verify with explain{C.RESET}")
     print(f"       {C.DIM}tally explain Amazon              # check by merchant name{C.RESET}")
     print(f"       {C.DIM}tally explain \"WHOLEFDS MKT\"      # test raw description{C.RESET}")
-    print(f"       {C.DIM}tally explain -c Food             # list all Food merchants{C.RESET}")
+    print(f"       {C.DIM}tally explain --category Food     # list all Food merchants{C.RESET}")
     print(f"       {C.DIM}tally explain --tags business     # list business-tagged{C.RESET}")
     print()
     print(f"    {C.BOLD}9. Strip prefixes, don't catch them{C.RESET}")

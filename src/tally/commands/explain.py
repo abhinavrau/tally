@@ -198,17 +198,32 @@ def cmd_explain(args):
         if not found_any:
             sys.exit(1)
 
-    elif hasattr(args, 'view') and args.view:
-        # Show all merchants in a specific view
-        view_name = args.view
-        views_config = config.get('sections')
+    else:
+        # Filter mode - apply all filters (can be combined)
+        by_merchant = stats.get('by_merchant', {})
+        matching_merchants = dict(by_merchant)  # Start with all
+        active_filters = []
 
-        # Classify by views
-        if views_config:
-            from ..analyzer import classify_by_sections, compute_section_totals
+        # Check for any active filters
+        has_view = hasattr(args, 'view') and args.view
+        has_category = hasattr(args, 'category') and args.category
+        has_tags = hasattr(args, 'tags') and args.tags
+        has_month = hasattr(args, 'month') and args.month
+        has_location = hasattr(args, 'location') and args.location
+
+        # Apply view filter
+        if has_view:
+            view_name = args.view
+            views_config_local = config.get('sections')
+
+            if not views_config_local:
+                print("No views.rules found. Create config/views.rules to define custom views.")
+                sys.exit(1)
+
+            from ..analyzer import classify_by_sections
             view_results = classify_by_sections(
-                stats['by_merchant'],
-                views_config,
+                matching_merchants,
+                views_config_local,
                 stats['num_months']
             )
 
@@ -220,85 +235,211 @@ def cmd_explain(args):
                     break
 
             if not view_match:
-                valid_views = [s.name for s in views_config.sections]
+                valid_views = [s.name for s in views_config_local.sections]
                 print(f"No view '{view_name}' found.", file=sys.stderr)
                 print(f"Available views: {', '.join(valid_views)}", file=sys.stderr)
                 sys.exit(1)
 
             merchants_list = view_results[view_match]
-            if not merchants_list:
-                print(f"No merchants in view '{view_match}'")
-                sys.exit(0)
+            matching_merchants = {name: data for name, data in merchants_list}
+            active_filters.append(f"view:{view_match}")
+
+        # Apply category filter
+        if has_category:
+            category = args.category
+            # Case-insensitive category match
+            matching_merchants = {
+                k: v for k, v in matching_merchants.items()
+                if v.get('category', '').lower() == category.lower()
+            }
+            active_filters.append(f"category:{category}")
+
+        # Apply tags filter
+        if has_tags:
+            filter_tags = set(t.strip().lower() for t in args.tags.split(','))
+            matching_merchants = {
+                k: v for k, v in matching_merchants.items()
+                if set(t.lower() for t in v.get('tags', [])) & filter_tags
+            }
+            active_filters.append(f"tags:{','.join(sorted(filter_tags))}")
+
+        # Apply month filter
+        if has_month:
+            # Collect available months from data
+            available_months = set()
+            for data in by_merchant.values():
+                for txn in data.get('transactions', []):
+                    if txn.get('month'):
+                        available_months.add(txn['month'])
+
+            month_filter = _parse_month_filter(args.month, available_months)
+            if month_filter:
+                matching_merchants = {
+                    k: v for k, v in matching_merchants.items()
+                    if _merchant_has_month(v, month_filter)
+                }
+                active_filters.append(f"month:{month_filter}")
+            else:
+                print(f"No month matching '{args.month}' in data", file=sys.stderr)
+                if available_months:
+                    print(f"Available months: {', '.join(sorted(available_months))}", file=sys.stderr)
+                sys.exit(1)
+
+        # Apply location filter
+        if has_location:
+            location_lower = args.location.lower()
+            matching_merchants = {
+                k: v for k, v in matching_merchants.items()
+                if _merchant_has_location(v, location_lower)
+            }
+            active_filters.append(f"location:{args.location}")
+
+        # If no filters applied, show summary
+        if not active_filters:
+            _print_explain_summary(stats, verbose)
+        else:
+            # Output filtered results
+            filter_desc = ' + '.join(active_filters)
 
             if args.format == 'json':
                 import json
-                merchants = [build_merchant_json(name, data, verbose) for name, data in merchants_list]
+                merchants = [build_merchant_json(name, data, verbose) for name, data in matching_merchants.items()]
                 merchants.sort(key=lambda x: x['monthly_value'], reverse=True)
-                print(json.dumps({'view': view_match, 'merchants': merchants}, indent=2))
+                output = {'filters': active_filters, 'merchants': merchants}
+                print(json.dumps(output, indent=2))
             else:
                 # Text format
-                merchants_dict = {name: data for name, data in merchants_list}
-                _print_classification_summary(view_match, merchants_dict, verbose, stats['num_months'])
-        else:
-            print("No views.rules found. Create config/views.rules to define custom views.")
-            sys.exit(1)
-
-    elif args.category:
-        # Filter by category
-        by_merchant = stats.get('by_merchant', {})
-        matching_merchants = {k: v for k, v in by_merchant.items() if v.get('category') == args.category}
-
-        if args.format == 'json':
-            import json
-            merchants = [build_merchant_json(name, data, verbose) for name, data in matching_merchants.items()]
-            merchants.sort(key=lambda x: x['monthly_value'], reverse=True)
-            print(json.dumps({'category': args.category, 'merchants': merchants}, indent=2))
-        else:
-            # Text format
-            if matching_merchants:
-                print(f"Merchants in category: {args.category}\n")
-                _print_classification_summary(args.category, matching_merchants, verbose, stats['num_months'])
-            else:
-                # Suggest categories that do exist
-                all_categories = set(v.get('category') for v in by_merchant.values() if v.get('category'))
-                print(f"No merchants found in category '{args.category}'")
-                if all_categories:
-                    print(f"\nAvailable categories: {', '.join(sorted(all_categories))}")
-
-    elif hasattr(args, 'tags') and args.tags:
-        # Filter by tags
-        filter_tags = set(t.strip().lower() for t in args.tags.split(','))
-        by_merchant = stats.get('by_merchant', {})
-
-        matching_merchants = {
-            k: v for k, v in by_merchant.items()
-            if set(t.lower() for t in v.get('tags', [])) & filter_tags
-        }
-
-        if args.format == 'json':
-            import json
-            merchants = [build_merchant_json(name, data, verbose) for name, data in matching_merchants.items()]
-            merchants.sort(key=lambda x: x['monthly_value'], reverse=True)
-            print(json.dumps({'tags': list(filter_tags), 'merchants': merchants}, indent=2))
-        else:
-            # Text format
-            if matching_merchants:
-                print(f"Merchants with tags: {', '.join(sorted(filter_tags))}\n")
-                _print_classification_summary('Tagged', matching_merchants, verbose, stats['num_months'])
-            else:
-                # Suggest tags that do exist
-                all_tags = set()
-                for data in by_merchant.values():
-                    all_tags.update(data.get('tags', []))
-                print(f"No merchants found with tags: {', '.join(sorted(filter_tags))}")
-                if all_tags:
-                    print(f"\nAvailable tags: {', '.join(sorted(all_tags))}")
-
-    else:
-        # No specific merchant - show classification summary
-        _print_explain_summary(stats, verbose)
+                if matching_merchants:
+                    print(f"Filtered by: {filter_desc}\n")
+                    _print_classification_summary('Filtered', matching_merchants, verbose, stats['num_months'])
+                else:
+                    print(f"No merchants found matching: {filter_desc}")
+                    _suggest_available_values(by_merchant, has_category, has_tags, has_month, has_location)
 
     _print_deprecation_warnings(config)
+
+
+def _parse_month_filter(month_str, available_months):
+    """Parse month filter string into YYYY-MM format.
+
+    Accepts:
+    - YYYY-MM (e.g., 2024-12)
+    - Month name (e.g., Dec, December) - matches against available data
+    - Month number (e.g., 12) - matches against available data
+
+    Args:
+        month_str: The month filter string from user input
+        available_months: Set of YYYY-MM strings from the data
+
+    Returns YYYY-MM string or None if invalid.
+    """
+    import re
+
+    month_str = month_str.strip()
+
+    # Try YYYY-MM format (exact match)
+    if re.match(r'^\d{4}-\d{2}$', month_str):
+        return month_str
+
+    month_names = {
+        'jan': '01', 'january': '01',
+        'feb': '02', 'february': '02',
+        'mar': '03', 'march': '03',
+        'apr': '04', 'april': '04',
+        'may': '05',
+        'jun': '06', 'june': '06',
+        'jul': '07', 'july': '07',
+        'aug': '08', 'august': '08',
+        'sep': '09', 'september': '09',
+        'oct': '10', 'october': '10',
+        'nov': '11', 'november': '11',
+        'dec': '12', 'december': '12',
+    }
+
+    # Try month name - find matching month in available data
+    month_lower = month_str.lower()
+    if month_lower in month_names:
+        month_num = month_names[month_lower]
+        # Find all available months ending with this month number
+        matches = [m for m in available_months if m.endswith(f'-{month_num}')]
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            # Multiple years have this month - return most recent
+            return sorted(matches)[-1]
+        return None
+
+    # Try month number - find matching month in available data
+    if re.match(r'^\d{1,2}$', month_str):
+        month_num = int(month_str)
+        if 1 <= month_num <= 12:
+            month_suffix = f'-{month_num:02d}'
+            matches = [m for m in available_months if m.endswith(month_suffix)]
+            if len(matches) == 1:
+                return matches[0]
+            elif len(matches) > 1:
+                # Multiple years have this month - return most recent
+                return sorted(matches)[-1]
+        return None
+
+    return None
+
+
+def _merchant_has_month(merchant_data, month_filter):
+    """Check if merchant has transactions in the specified month."""
+    transactions = merchant_data.get('transactions', [])
+    for txn in transactions:
+        txn_month = txn.get('month', '')
+        if txn_month == month_filter:
+            return True
+    return False
+
+
+def _merchant_has_location(merchant_data, location_lower):
+    """Check if merchant has transactions with the specified location."""
+    transactions = merchant_data.get('transactions', [])
+    for txn in transactions:
+        txn_location = txn.get('location', '')
+        if txn_location and location_lower in txn_location.lower():
+            return True
+    return False
+
+
+def _suggest_available_values(by_merchant, has_category, has_tags, has_month, has_location):
+    """Suggest available filter values when no matches found."""
+    if has_category:
+        all_categories = set(v.get('category') for v in by_merchant.values() if v.get('category'))
+        if all_categories:
+            print(f"\nAvailable categories: {', '.join(sorted(all_categories))}")
+
+    if has_tags:
+        all_tags = set()
+        for data in by_merchant.values():
+            all_tags.update(data.get('tags', []))
+        if all_tags:
+            print(f"\nAvailable tags: {', '.join(sorted(all_tags))}")
+
+    if has_month:
+        all_months = set()
+        for data in by_merchant.values():
+            for txn in data.get('transactions', []):
+                if txn.get('month'):
+                    all_months.add(txn['month'])
+        if all_months:
+            print(f"\nAvailable months: {', '.join(sorted(all_months))}")
+
+    if has_location:
+        all_locations = set()
+        for data in by_merchant.values():
+            for txn in data.get('transactions', []):
+                if txn.get('location'):
+                    all_locations.add(txn['location'])
+        if all_locations:
+            # Show unique locations, limit to 10
+            sorted_locs = sorted(all_locations)[:10]
+            print(f"\nSample locations: {', '.join(sorted_locs)}")
+            if len(all_locations) > 10:
+                print(f"  ... and {len(all_locations) - 10} more")
 
 
 def _format_match_expr(pattern):
