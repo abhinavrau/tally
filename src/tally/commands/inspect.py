@@ -83,12 +83,49 @@ def cmd_inspect(args):
             print("File appears to be empty.")
             return
 
-    # Display header info
-    if has_header and rows:
-        print("\nDetected Headers:")
+    # Analyze all columns
+    column_analysis = _analyze_columns(filepath, has_header=has_header, max_rows=100)
+
+    # Display column analysis
+    if column_analysis:
+        print("\nColumn Analysis:")
         print("-" * 70)
-        for idx, col in enumerate(rows[0]):
-            print(f"  Column {idx}: {col}")
+        for i, col in enumerate(column_analysis):
+            header = col['header']
+            col_type = col['type']
+            fmt = col.get('format') or ''
+
+            # Build type description
+            type_desc = col_type
+            if fmt:
+                type_desc = f"{col_type} ({fmt})"
+            if col['empty_pct'] >= 90:
+                type_desc = f"empty ({col['empty_pct']:.0f}% blank)"
+            elif col.get('distinct_values') and col_type == 'categorical':
+                n_distinct = len(col['distinct_values'])
+                type_desc = f"categorical ({n_distinct} values)"
+
+            # Add observations inline
+            obs_str = ''
+            if col.get('observations'):
+                obs_str = f" - {'; '.join(col['observations'])}"
+
+            print(f"  [{i:2}] {header:<25} {type_desc}{obs_str}")
+
+    # Show categorical columns with their values
+    categorical_cols = [c for c in column_analysis if c.get('distinct_values') and len(c['distinct_values']) <= 15]
+    if categorical_cols:
+        print("\nCategorical Column Values:")
+        print("-" * 70)
+        for col in categorical_cols:
+            header = col['header']
+            values = col['distinct_values']
+            # Sort by count descending
+            sorted_vals = sorted(values.items(), key=lambda x: -x[1])
+            val_strs = [f"{v} ({c})" for v, c in sorted_vals[:8]]
+            if len(sorted_vals) > 8:
+                val_strs.append(f"...+{len(sorted_vals) - 8} more")
+            print(f"  {header}: {', '.join(val_strs)}")
 
     # Display sample data
     print(f"\nSample Data (first {min(num_rows, len(rows)-1)} rows):")
@@ -139,55 +176,40 @@ def cmd_inspect(args):
         print(f"\n  Suggested format string:")
         print(f'    format: "{format_str}"')
 
-        # Analyze amount patterns
-        analysis = _analyze_amount_patterns(filepath, spec.amount_column, has_header=True)
+        # Analyze amount patterns - detailed analysis with both signs
+        analysis = _analyze_amount_column_detailed(filepath, spec.amount_column, has_header=True)
         if analysis:
             print("\n" + "=" * 70)
-            print("Amount Sign Analysis:")
+            print("Amount Distribution:")
             print("-" * 70)
-            print(f"  Positive amounts: {analysis['positive_count']} (${analysis['positive_total']:,.2f})")
-            print(f"  Negative amounts: {analysis['negative_count']} (${analysis['negative_total']:,.2f})")
-            print(f"  Distribution: {analysis['positive_pct']:.1f}% positive")
+            print(f"  {analysis['positive_count']} positive amounts, totaling ${analysis['positive_total']:,.2f}")
+            print(f"  {analysis['negative_count']} negative amounts, totaling ${analysis['negative_total']:,.2f}")
 
-            print(f"\n  Sign convention: {analysis['sign_convention'].replace('_', ' ')}")
-            print(f"    Rationale: {analysis['rationale']}")
+            # Show format observations
+            if analysis['format_observations']:
+                print(f"\n  Format observations:")
+                for obs in analysis['format_observations']:
+                    print(f"    - {obs}")
 
-            if analysis['suggest_negate']:
-                print("\n  Recommendation: Use {-amount} to normalize signs")
-                print("    Your data has expenses as NEGATIVE values.")
-                print("    Using {-amount} will flip signs so expenses become positive.")
-                print(f'\n    format: "{format_str.replace("{amount}", "{-amount}")}"')
-                print("\n  OR: Keep raw signs and write sign-aware rules:")
-                print("    match: contains(\"GROCERY\") and amount < 0  # expenses")
-                print("    match: contains(\"REFUND\") and amount > 0   # credits")
-            else:
-                print("\n  Your data has expenses as POSITIVE values (standard convention).")
-                print("  No sign normalization needed.")
-                print("\n  To match by sign in rules:")
-                print("    match: contains(\"GROCERY\") and amount > 0  # expenses")
-                print("    match: contains(\"REFUND\") and amount < 0   # credits/refunds")
+            # Show sample positive transactions
+            if analysis['sample_positive']:
+                print(f"\n  Sample positive:")
+                for desc, amt in analysis['sample_positive']:
+                    truncated = desc[:45] + '...' if len(desc) > 45 else desc
+                    print(f"    +${amt:,.2f}  {truncated}")
 
-            # Always show the +amount option for mixed-sign sources
-            print("\n  TIP: For mixed-sign sources (e.g., escrow accounts):")
-            print(f'    format: "{format_str.replace("{amount}", "{+amount}")}"')
-            print("    {+amount} takes absolute value - all amounts become positive.")
+            # Show sample negative transactions
+            if analysis['sample_negative']:
+                print(f"\n  Sample negative:")
+                for desc, amt in analysis['sample_negative']:
+                    truncated = desc[:45] + '...' if len(desc) > 45 else desc
+                    print(f"    -${abs(amt):,.2f}  {truncated}")
 
-            # Show sample credits as hints
-            if analysis['sample_credits']:
-                print("\n  Sample negative amounts (may be refunds/credits/income):")
-                for desc, amt in analysis['sample_credits'][:5]:
-                    truncated = desc[:40] + '...' if len(desc) > 40 else desc
-                    print(f"    ${amt:,.2f}  {truncated}")
-                print("\n  Use special tags to handle these transactions:")
-                print(f"    {C.CYAN}refund{C.RESET}   - Returns/credits (nets against merchant spending)")
-                print(f"    {C.CYAN}income{C.RESET}   - Deposits/salary (excluded from spending)")
-                print(f"    {C.CYAN}transfer{C.RESET} - Account transfers (excluded from spending)")
-                print("\n  Example rule for refunds:")
-                print("    [Amazon Refund]")
-                print("    match: contains(\"AMAZON\") and amount < 0")
-                print("    category: Shopping")
-                print("    subcategory: Online")
-                print(f"    {C.CYAN}tags: refund{C.RESET}")
+            # Show amount modifier options (not recommendations)
+            print("\n  Amount modifiers available:")
+            print(f"    {{amount}}   - use values as-is")
+            print(f"    {{-amount}}  - negate (flip sign)")
+            print(f"    {{+amount}}  - absolute value")
 
     except ValueError as e:
         print(f"  Could not auto-detect: {e}")
@@ -423,4 +445,317 @@ def _analyze_amount_patterns(filepath, amount_col, has_header=True, delimiter=No
         'suggest_negate': suggest_negate,
         'rationale': rationale,
         'sample_credits': sample_credits,
+    }
+
+
+def _analyze_columns(filepath, has_header=True, max_rows=100):
+    """
+    Analyze all columns in a CSV to detect their types and patterns.
+
+    Returns list of dicts, one per column:
+        - header: column header (or "Column N")
+        - type: detected type (date, currency, number, text, empty, categorical)
+        - format: additional format info (e.g., date format, decimal places)
+        - sample_values: list of sample non-empty values
+        - empty_pct: percentage of empty values
+        - distinct_values: dict of value -> count (for low-cardinality columns)
+        - min_val, max_val: for numeric columns
+    """
+    import re as re_mod
+
+    columns = []
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+
+            if has_header:
+                headers = next(reader, None)
+                if not headers:
+                    return []
+            else:
+                # Peek at first row to determine column count
+                first_row = next(reader, None)
+                if not first_row:
+                    return []
+                # Generate synthetic headers
+                headers = [f'Column {i}' for i in range(len(first_row))]
+                # Reset to re-read file including first row as data
+                f.seek(0)
+                reader = csv.reader(f)
+
+            # Initialize column stats
+            num_cols = len(headers)
+            col_stats = []
+            for i, h in enumerate(headers):
+                col_stats.append({
+                    'header': h if h else f'Column {i}',
+                    'values': [],
+                    'empty_count': 0,
+                    'total_count': 0,
+                })
+
+            # Collect values from rows
+            for row_num, row in enumerate(reader):
+                if row_num >= max_rows:
+                    break
+                for i, val in enumerate(row):
+                    if i < len(col_stats):
+                        col_stats[i]['total_count'] += 1
+                        val = val.strip()
+                        if not val:
+                            col_stats[i]['empty_count'] += 1
+                        else:
+                            col_stats[i]['values'].append(val)
+
+            # Analyze each column
+            for i, stats in enumerate(col_stats):
+                col_info = {
+                    'header': stats['header'],
+                    'type': 'unknown',
+                    'format': None,
+                    'sample_values': stats['values'][:5],
+                    'empty_pct': (stats['empty_count'] / stats['total_count'] * 100)
+                                 if stats['total_count'] > 0 else 100,
+                    'distinct_values': None,
+                    'observations': [],
+                }
+
+                values = stats['values']
+
+                # Check for empty column
+                if not values:
+                    col_info['type'] = 'empty'
+                    columns.append(col_info)
+                    continue
+
+                # Detect column type
+                col_info['type'], col_info['format'], col_info['observations'] = \
+                    _detect_column_type(values, stats['header'])
+
+                # For categorical columns, count distinct values
+                if col_info['type'] == 'categorical' or len(set(values)) <= 20:
+                    value_counts = {}
+                    for v in values:
+                        value_counts[v] = value_counts.get(v, 0) + 1
+                    col_info['distinct_values'] = value_counts
+
+                columns.append(col_info)
+
+    except Exception:
+        return []
+
+    return columns
+
+
+def _detect_column_type(values, header=''):
+    """
+    Detect the type of a column based on sample values.
+
+    Returns (type, format, observations) tuple.
+    """
+    import re as re_mod
+
+    if not values:
+        return 'empty', None, []
+
+    observations = []
+    header_lower = header.lower()
+
+    # Date patterns
+    date_patterns = [
+        (r'^\d{1,2}/\d{1,2}/\d{4}$', '%m/%d/%Y', 'MM/DD/YYYY'),
+        (r'^\d{1,2}/\d{1,2}/\d{2}$', '%m/%d/%y', 'MM/DD/YY'),
+        (r'^\d{4}-\d{2}-\d{2}$', '%Y-%m-%d', 'YYYY-MM-DD (ISO)'),
+        (r'^\d{1,2}-\d{1,2}-\d{4}$', '%m-%d-%Y', 'MM-DD-YYYY'),
+        (r'^\d{1,2}\.\d{1,2}\.\d{4}$', '%d.%m.%Y', 'DD.MM.YYYY (European)'),
+    ]
+
+    # Check if it looks like a date column
+    for pattern, fmt, desc in date_patterns:
+        matches = sum(1 for v in values if re_mod.match(pattern, v))
+        if matches >= len(values) * 0.8:
+            return 'date', fmt, [f'Format: {desc}']
+
+    # Currency patterns (with symbol)
+    currency_with_symbol = re_mod.compile(r'^[$€£¥]\s*-?[\d,]+\.?\d*$|^-?[$€£¥]\s*[\d,]+\.?\d*$')
+    currency_matches = sum(1 for v in values if currency_with_symbol.match(v))
+    if currency_matches >= len(values) * 0.8:
+        # Detect which currency symbol
+        symbols = {'$': 0, '€': 0, '£': 0, '¥': 0}
+        for v in values:
+            for sym in symbols:
+                if sym in v:
+                    symbols[sym] += 1
+        main_symbol = max(symbols, key=symbols.get) if any(symbols.values()) else '$'
+        return 'currency', main_symbol, [f'Currency symbol: {main_symbol}']
+
+    # Numeric patterns (including negative, decimals)
+    numeric_pattern = re_mod.compile(r'^-?[\d,]+\.?\d*$|^\([\d,]+\.?\d*\)$')
+    numeric_matches = sum(1 for v in values if numeric_pattern.match(v))
+
+    if numeric_matches >= len(values) * 0.8:
+        # Check for currency hints in header
+        if any(s in header_lower for s in ['$', 'amount', 'price', 'cost', 'fee', 'balance', 'total']):
+            # Analyze number format
+            has_decimals = any('.' in v for v in values)
+            has_negatives = any(v.startswith('-') or v.startswith('(') for v in values)
+            has_thousands = any(',' in v for v in values)
+
+            obs = []
+            if has_decimals:
+                # Count decimal places
+                decimal_places = set()
+                for v in values:
+                    if '.' in v:
+                        parts = v.replace('(', '').replace(')', '').replace('-', '').split('.')
+                        if len(parts) == 2:
+                            decimal_places.add(len(parts[1]))
+                if decimal_places:
+                    obs.append(f'Decimal places: {", ".join(str(d) for d in sorted(decimal_places))}')
+            if has_negatives:
+                obs.append('Contains negative values')
+            if has_thousands:
+                obs.append('Uses thousands separator (,)')
+
+            return 'currency', None, obs
+
+        return 'number', None, []
+
+    # Check for categorical (low distinct values)
+    distinct = set(values)
+    if len(distinct) <= 15 and len(values) >= 5:
+        return 'categorical', None, [f'{len(distinct)} distinct values']
+
+    # Check for ticker/symbol (short uppercase alphanumeric)
+    ticker_pattern = re_mod.compile(r'^[A-Z]{1,5}$')
+    ticker_matches = sum(1 for v in values if ticker_pattern.match(v))
+    if ticker_matches >= len(values) * 0.5:
+        return 'ticker/symbol', None, ['Short uppercase codes']
+
+    # Default to text
+    avg_len = sum(len(v) for v in values) / len(values) if values else 0
+    if avg_len > 30:
+        return 'text', None, ['Long text values']
+    return 'text', None, []
+
+
+def _analyze_amount_column_detailed(filepath, amount_col, desc_col=1, has_header=True, max_rows=1000):
+    """
+    Detailed analysis of amount column showing both positive and negative samples.
+
+    Returns dict with:
+        - positive_count, positive_total, sample_positive
+        - negative_count, negative_total, sample_negative
+        - format_observations: list of format-related observations
+    """
+    import re as re_mod
+
+    positive_count = 0
+    negative_count = 0
+    positive_total = 0.0
+    negative_total = 0.0
+    sample_positive = []  # (description, amount) tuples
+    sample_negative = []  # (description, amount) tuples
+    format_observations = []
+
+    # Track format details
+    has_decimals = False
+    has_integers = False
+    has_currency_symbols = False
+    has_parentheses_negative = False
+    decimal_places = set()
+
+    def parse_amount(val):
+        nonlocal has_decimals, has_integers, has_currency_symbols, has_parentheses_negative, decimal_places
+        if not val:
+            return None
+        original = val
+        val = val.strip()
+
+        # Detect currency symbols
+        if re_mod.search(r'[$€£¥]', val):
+            has_currency_symbols = True
+
+        # Remove currency symbols, commas
+        val = re_mod.sub(r'[$€£¥,]', '', val)
+
+        # Handle parentheses as negative
+        if val.startswith('(') and val.endswith(')'):
+            has_parentheses_negative = True
+            val = '-' + val[1:-1]
+
+        try:
+            result = float(val)
+            # Track decimal places
+            if '.' in original:
+                has_decimals = True
+                parts = val.split('.')
+                if len(parts) == 2:
+                    decimal_places.add(len(parts[1]))
+            else:
+                has_integers = True
+            return result
+        except ValueError:
+            return None
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            if has_header:
+                headers = next(reader, None)
+                # Try to find description column
+                for idx, h in enumerate(headers or []):
+                    hl = h.lower()
+                    if any(x in hl for x in ['desc', 'merchant', 'payee', 'name', 'action', 'memo']):
+                        desc_col = idx
+                        break
+
+            for i, row in enumerate(reader):
+                if i >= max_rows:
+                    break
+                if amount_col < len(row):
+                    amount = parse_amount(row[amount_col])
+                    if amount is not None:
+                        desc = row[desc_col] if desc_col < len(row) else ''
+                        if amount > 0:
+                            positive_count += 1
+                            positive_total += amount
+                            if len(sample_positive) < 5:
+                                sample_positive.append((desc.strip(), amount))
+                        elif amount < 0:
+                            negative_count += 1
+                            negative_total += abs(amount)
+                            if len(sample_negative) < 5:
+                                sample_negative.append((desc.strip(), amount))
+                        # Skip zeros
+
+    except Exception:
+        return None
+
+    total_count = positive_count + negative_count
+    if total_count == 0:
+        return None
+
+    # Build format observations
+    if has_decimals and has_integers:
+        format_observations.append('Mixed: some values have decimals, some are integers')
+    if has_currency_symbols:
+        format_observations.append('Values contain currency symbols')
+    if has_parentheses_negative:
+        format_observations.append('Negative values use parentheses notation')
+    if decimal_places:
+        if len(decimal_places) == 1:
+            format_observations.append(f'Consistent {list(decimal_places)[0]} decimal places')
+        else:
+            format_observations.append(f'Decimal places vary: {sorted(decimal_places)}')
+
+    return {
+        'positive_count': positive_count,
+        'positive_total': positive_total,
+        'sample_positive': sample_positive,
+        'negative_count': negative_count,
+        'negative_total': negative_total,
+        'sample_negative': sample_negative,
+        'format_observations': format_observations,
     }
