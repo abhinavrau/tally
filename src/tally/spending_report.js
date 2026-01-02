@@ -635,18 +635,10 @@ createApp({
         });
 
         // Categories to display - show all with non-negative totals
-        // Excludes: negative totals (credits) and income/transfer/investment categories
+        // Negative totals (credits/refunds) are shown in the Credits section
         const positiveCategoryView = computed(() => {
             const result = {};
-            // These category names indicate income/transfer/investment - exclude from main display
-            const excludedCategories = new Set(['income', 'transfer', 'transfers', 'investment', 'investments']);
-
             for (const [catName, category] of Object.entries(filteredCategoryView.value)) {
-                // Skip excluded categories (income, transfer, investment)
-                if (excludedCategories.has(catName.toLowerCase())) {
-                    continue;
-                }
-                // Include only positive totals (negative = credits section)
                 if (category.filteredTotal >= 0) {
                     result[catName] = category;
                 }
