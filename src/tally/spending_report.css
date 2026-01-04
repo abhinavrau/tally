@@ -766,6 +766,19 @@ th[data-tooltip] { cursor: pointer; }
 .match-info-trigger:hover {
     color: var(--accent-blue);
 }
+
+/* Merchant list trigger (in subcategory mode) */
+.merchant-list-trigger {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+.merchant-list-trigger:hover {
+    color: var(--accent-blue);
+}
 /* Elevate the row's stacking context when info icon is hovered */
 .merchant-row:has(.match-info-icon:hover) {
     position: relative;
@@ -1453,4 +1466,5 @@ section:nth-child(5) { animation-delay: 0.4s; }
     border-color: var(--accent-blue);
     color: white;
 }
+
 

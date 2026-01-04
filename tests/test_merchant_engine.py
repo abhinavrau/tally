@@ -236,8 +236,8 @@ subcategory: Streaming
         assert result.merchant == ""
         assert result.category == ""
 
-    def test_first_match_wins(self):
-        """First matching categorization rule wins."""
+    def test_most_specific_wins(self):
+        """Most specific matching rule wins (not first-match)."""
         content = '''
 [Streaming Service]
 match: contains("NETFLIX")
@@ -253,9 +253,10 @@ subcategory: Monthly
         txn = {'description': 'NETFLIX.COM', 'amount': 15.99}
         result = engine.match(txn)
 
-        # First rule matches first
-        assert result.category == "Entertainment"
-        assert result.merchant == "Streaming Service"
+        # More specific rule wins (2 pattern conditions vs 1)
+        assert result.category == "Subscriptions"
+        assert result.subcategory == "Monthly"
+        assert result.merchant == "Netflix Specific"
 
     def test_amount_condition(self):
         """Amount condition in match expression."""
@@ -319,6 +320,141 @@ subcategory: Delivery
 
         assert engine.match(rides).category == "Transportation"
         assert engine.match(eats).category == "Food"
+
+
+class TestSpecificityResolution:
+    """Tests for specificity-based matching."""
+
+    def test_longer_pattern_more_specific(self):
+        """Longer pattern is more specific than shorter."""
+        content = '''
+[Amazon]
+match: contains("AMAZON")
+category: Shopping
+subcategory: General
+
+[Amazon Prime]
+match: contains("AMAZON PRIME")
+category: Subscriptions
+subcategory: Prime
+'''
+        engine = parse_merchants(content)
+
+        # Short pattern matches less specific rule
+        regular = {'description': 'AMAZON ORDER', 'amount': 50.0}
+        assert engine.match(regular).category == "Shopping"
+
+        # Longer pattern matches more specific rule
+        prime = {'description': 'AMAZON PRIME MEMBERSHIP', 'amount': 15.0}
+        assert engine.match(prime).category == "Subscriptions"
+
+    def test_more_conditions_more_specific(self):
+        """Rule with more conditions is more specific."""
+        content = '''
+[Any Costco]
+match: contains("COSTCO")
+category: Shopping
+subcategory: General
+
+[Large Costco]
+match: contains("COSTCO") and amount > 200
+category: Shopping
+subcategory: Bulk
+'''
+        engine = parse_merchants(content)
+
+        # Small purchase - only general rule matches
+        small = {'description': 'COSTCO #123', 'amount': 50.0}
+        assert engine.match(small).subcategory == "General"
+
+        # Large purchase - both match, more specific wins
+        large = {'description': 'COSTCO #123', 'amount': 500.0}
+        assert engine.match(large).subcategory == "Bulk"
+
+    def test_per_field_resolution(self):
+        """Merchant, category, subcategory resolved independently."""
+        content = '''
+[Costco Food]
+match: contains("COSTCO") and amount < 100
+category: Food
+subcategory: Grocery
+merchant: Costco
+
+[Large Purchase]
+match: amount > 200
+category: Shopping
+subcategory: Big Ticket
+
+[Holiday Tag]
+match: month >= 11 and month <= 12
+tags: holiday
+'''
+        engine = parse_merchants(content)
+        from datetime import date
+
+        # Transaction matches Large Purchase for category/subcategory
+        # and Holiday Tag for tags
+        txn = {
+            'description': 'COSTCO WHOLESALE',
+            'amount': 500.0,
+            'date': date(2025, 12, 15)
+        }
+        result = engine.match(txn)
+
+        # category from Large Purchase (amount > 200)
+        assert result.category == "Shopping"
+        # subcategory from Large Purchase
+        assert result.subcategory == "Big Ticket"
+        # tags accumulated from Holiday Tag
+        assert "holiday" in result.tags
+
+    def test_priority_overrides_specificity(self):
+        """Explicit priority beats calculated specificity."""
+        content = '''
+[General Amazon]
+match: contains("AMAZON")
+category: Shopping
+subcategory: General
+priority: 100
+
+[Specific Amazon]
+match: contains("AMAZON") and contains(".COM")
+category: Subscriptions
+subcategory: Online
+priority: 10
+'''
+        engine = parse_merchants(content)
+        txn = {'description': 'AMAZON.COM ORDER', 'amount': 50.0}
+        result = engine.match(txn)
+
+        # Higher priority (100) wins over higher specificity
+        assert result.category == "Shopping"
+        assert result.merchant == "General Amazon"
+
+    def test_all_matching_rules_tracked(self):
+        """All matching rules are tracked in result."""
+        content = '''
+[Netflix]
+match: contains("NETFLIX")
+category: Subscriptions
+subcategory: Streaming
+
+[Large]
+match: amount > 50
+tags: large
+
+[Entertainment]
+match: contains("NETFLIX") or contains("HULU")
+tags: entertainment
+'''
+        engine = parse_merchants(content)
+        txn = {'description': 'NETFLIX.COM', 'amount': 100.0}
+        result = engine.match(txn)
+
+        # All 3 rules should be in all_matching_rules
+        assert len(result.all_matching_rules) == 3
+        rule_names = {r.name for r in result.all_matching_rules}
+        assert rule_names == {"Netflix", "Large", "Entertainment"}
 
 
 class TestTwoPassTagging:

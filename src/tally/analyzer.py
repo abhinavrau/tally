@@ -575,8 +575,16 @@ def export_markdown(stats, verbose=0, category_filter=None, merchant_filter=None
     return '\n'.join(lines)
 
 
-def print_summary(stats, year=2025, filter_category=None, currency_format="${amount}"):
-    """Print analysis summary."""
+def print_summary(stats, year=2025, filter_category=None, currency_format="${amount}", group_by='merchant'):
+    """Print analysis summary.
+
+    Args:
+        stats: Analysis statistics dict
+        year: Year for display
+        filter_category: Optional category to filter to
+        currency_format: Format string for currency
+        group_by: How to group in BY CATEGORY section - 'merchant' or 'subcategory'
+    """
     # Lazy import to avoid circular dependency
     from .cli import C
 
@@ -690,19 +698,57 @@ def print_summary(stats, year=2025, filter_category=None, currency_format="${amo
     # BY CATEGORY (with percentages)
     # =========================================================================
     print("\n" + "=" * 80)
-    print("BY CATEGORY")
+    print(f"BY CATEGORY (grouped by {group_by})")
     print("=" * 80)
-    print(f"\n{'Category':<20} {'Subcategory':<16} {'YTD':>12} {'%':>8}")
-    print("-" * 60)
 
-    # Only show positive categories (credits shown separately above)
-    positive_cats = [(k, v) for k, v in by_category.items() if v['total'] > 0]
-    sorted_cats = sorted(positive_cats, key=lambda x: x[1]['total'], reverse=True)
-    for (cat, subcat), data in sorted_cats[:20]:
-        if filter_category and cat.lower() != filter_category.lower():
-            continue
-        pct = (data['total'] / gross_spending * 100) if gross_spending > 0 else 0
-        print(f"{cat:<20} {subcat:<16} {fmt(data['total']):>12} {pct:>7.1f}%")
+    if group_by == 'subcategory':
+        # Group by subcategory within category
+        print(f"\n{'Category':<20} {'Subcategory':<16} {'YTD':>12} {'%':>8}")
+        print("-" * 60)
+
+        # Only show positive categories (credits shown separately above)
+        positive_cats = [(k, v) for k, v in by_category.items() if v['total'] > 0]
+        sorted_cats = sorted(positive_cats, key=lambda x: x[1]['total'], reverse=True)
+        for (cat, subcat), data in sorted_cats[:20]:
+            if filter_category and cat.lower() != filter_category.lower():
+                continue
+            pct = (data['total'] / gross_spending * 100) if gross_spending > 0 else 0
+            print(f"{cat:<20} {subcat:<16} {fmt(data['total']):>12} {pct:>7.1f}%")
+    else:
+        # Group by merchant within category (default)
+        print(f"\n{'Category':<20} {'Merchant':<20} {'YTD':>12} {'%':>8}")
+        print("-" * 64)
+
+        # Build category -> merchants mapping
+        cat_merchants = {}
+        for merchant, data in by_merchant.items():
+            if data['total'] <= 0:
+                continue
+            cat = data.get('category', 'Unknown')
+            if cat not in cat_merchants:
+                cat_merchants[cat] = []
+            cat_merchants[cat].append((merchant, data))
+
+        # Sort categories by total
+        sorted_cats = sorted(
+            cat_merchants.items(),
+            key=lambda x: sum(d['total'] for _, d in x[1]),
+            reverse=True
+        )
+
+        count = 0
+        for cat, merchants in sorted_cats:
+            if filter_category and cat.lower() != filter_category.lower():
+                continue
+            if count >= 20:
+                break
+            # Sort merchants within category by total
+            for merchant, data in sorted(merchants, key=lambda x: x[1]['total'], reverse=True)[:5]:
+                pct = (data['total'] / gross_spending * 100) if gross_spending > 0 else 0
+                print(f"{cat:<20} {merchant[:20]:<20} {fmt(data['total']):>12} {pct:>7.1f}%")
+                count += 1
+                if count >= 20:
+                    break
 
 
 def print_sections_summary(stats, year=2025, currency_format="${amount}", only_filter=None):

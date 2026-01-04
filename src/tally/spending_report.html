@@ -159,13 +159,20 @@
                 </div>
             </div>
 
-            <!-- View Toggle -->
-            <div class="view-toggle" v-if="hasSections">
-                <button :class="{ active: currentView === 'category' }" @click="currentView = 'category'">
-                    By Category
+            <!-- Unified View Toggle -->
+            <div class="view-toggle">
+                <button :class="{ active: currentView === 'category' && groupByMode === 'merchant' }"
+                        @click="currentView = 'category'; groupByMode = 'merchant'">
+                    Merchant
                 </button>
-                <button :class="{ active: currentView === 'section' }" @click="currentView = 'section'">
-                    By View
+                <button :class="{ active: currentView === 'category' && groupByMode === 'subcategory' }"
+                        @click="currentView = 'category'; groupByMode = 'subcategory'">
+                    Subcategory
+                </button>
+                <button v-if="hasSections"
+                        :class="{ active: currentView === 'section' }"
+                        @click="currentView = 'section'">
+                    View
                 </button>
             </div>
 
@@ -199,8 +206,8 @@
                 ></merchant-section>
             </template>
 
-            <!-- Category View -->
-            <template v-if="currentView === 'category'">
+            <!-- Category View - Grouped by Merchant -->
+            <template v-if="currentView === 'category' && groupByMode === 'merchant'">
                 <merchant-section
                     v-for="(category, categoryName) in positiveCategoryView"
                     :key="categoryName"
@@ -233,29 +240,40 @@
                 ></merchant-section>
             </template>
 
-            <!-- Credits Section (refunds/credits that reduced spending) -->
-            <merchant-section
-                v-if="creditMerchants.length > 0"
-                section-key="credits"
-                title="Credits Applied"
-                :items="creditMerchants"
-                :show-total="true"
-                :total-amount="creditsTotal"
-                total-label="Total Credits"
-                subtitle="(reduced spending)"
-                :credit-mode="true"
-                :collapsed-sections="collapsedSections"
-                :sort-config="sortConfig"
-                :expanded-items="expandedMerchants"
-                :extra-field-matches="extraFieldMatches"
-                :toggle-section="toggleSection"
-                :toggle-sort="toggleSort"
-                :format-currency="formatCurrency"
-                :format-date="formatDate"
-                :add-filter="addFilter"
-                :highlight-description="highlightDescription"
-                :tag-color="tagColor"
-            ></merchant-section>
+            <!-- Category View - Grouped by Subcategory -->
+            <template v-if="currentView === 'category' && groupByMode === 'subcategory'">
+                <merchant-section
+                    v-for="(category, categoryName) in subcategoryGroupedView"
+                    :key="categoryName"
+                    :section-key="'cat:' + categoryName"
+                    :title="categoryName"
+                    :items="category.sortedSubcategories"
+                    :total-amount="category.filteredTotal"
+                    :category-total="category.filteredTotal"
+                    :grand-total="grandTotal"
+                    :gross-spending="grossSpending"
+                    :income-total="incomeTotal"
+                    :investment-total="investmentTotal"
+                    :type-totals="category.typeTotals"
+                    :num-months="numFilteredMonths"
+                    :header-color="categoryColorMap[categoryName]"
+                    :category-mode="true"
+                    :subcategory-mode="true"
+                    :collapsed-sections="collapsedSections"
+                    :sort-config="sortConfig"
+                    :expanded-items="expandedMerchants"
+                    :extra-field-matches="extraFieldMatches"
+                    :toggle-section="toggleSection"
+                    :toggle-sort="toggleSort"
+                    :format-currency="formatCurrency"
+                    :format-date="formatDate"
+                    :format-pct="formatPct"
+                    :add-filter="addFilter"
+                    :get-location-class="getLocationClass"
+                    :highlight-description="highlightDescription"
+                    :tag-color="tagColor"
+                ></merchant-section>
+            </template>
 
             <!-- Footer -->
             <footer>

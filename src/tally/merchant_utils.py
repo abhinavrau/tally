@@ -537,7 +537,8 @@ def normalize_merchant(
     if _cached_engine is not None:
         result = _cached_engine.match(transaction, data_sources=data_sources)
 
-        if result.merchant:
+        # Check if a categorization rule matched (not just tag-only rules)
+        if result.matched:
             match_info = {
                 'pattern': result.matched_rule.match_expr if result.matched_rule else None,
                 'source': 'user',
@@ -552,7 +553,7 @@ def normalize_merchant(
                 match_info['extra_fields'] = result.extra_fields
             return (result.merchant, result.category, result.subcategory, match_info)
 
-        # No match from engine - fallback to extract merchant name
+        # No categorization match - fallback to extract merchant name
         merchant_name = extract_merchant_name(description)
         if result.tags or raw_values:
             match_info = {'pattern': None, 'source': 'auto', 'tags': list(result.tags)}

@@ -39,6 +39,7 @@ class MerchantRule:
     subcategory: str = ""
     merchant: str = ""  # Display name (defaults to rule name)
     tags: Set[str] = field(default_factory=set)
+    priority: int = 50  # Higher priority = checked first for tie-breaking (default 50)
     line_number: int = 0  # For error reporting
     let_bindings: List[Tuple[str, str]] = field(default_factory=list)  # [(var_name, expr), ...]
     fields: Dict[str, str] = field(default_factory=dict)  # {field_name: expr} extra fields to add
@@ -52,6 +53,16 @@ class MerchantRule:
         """True if this rule assigns a category (not just tags)."""
         return bool(self.category)
 
+    @property
+    def has_merchant(self) -> bool:
+        """True if this rule sets a merchant name."""
+        return bool(self.merchant)
+
+    @property
+    def has_subcategory(self) -> bool:
+        """True if this rule sets a subcategory."""
+        return bool(self.subcategory)
+
 
 @dataclass
 class MatchResult:
@@ -62,10 +73,51 @@ class MatchResult:
     category: str = ""
     subcategory: str = ""
     tags: Set[str] = field(default_factory=set)
-    matched_rule: Optional[MerchantRule] = None
-    tag_rules: List[MerchantRule] = field(default_factory=list)
+    matched_rule: Optional[MerchantRule] = None  # Rule that set category (most specific)
+    merchant_rule: Optional[MerchantRule] = None  # Rule that set merchant (most specific)
+    subcategory_rule: Optional[MerchantRule] = None  # Rule that set subcategory (most specific)
+    all_matching_rules: List[MerchantRule] = field(default_factory=list)  # All rules that matched
+    tag_rules: List[MerchantRule] = field(default_factory=list)  # Rules that contributed tags
     extra_fields: Dict[str, Any] = field(default_factory=dict)  # Evaluated fields from matching rule
     tag_sources: Dict[str, Dict] = field(default_factory=dict)  # {tag: {rule: name, pattern: expr}}
+
+
+def calculate_specificity(rule: MerchantRule) -> Tuple[int, int, int, int]:
+    """
+    Calculate specificity score for a rule.
+
+    Higher specificity = more specific rule = wins in conflict resolution.
+    Returns tuple for lexicographic comparison:
+        (priority, pattern_conditions, field_constraints, pattern_length)
+
+    Examples:
+        contains("UBER")                          -> (50, 1, 0, 4)
+        contains("UBER") and contains("EATS")     -> (50, 2, 0, 8)
+        contains("UBER") and amount > 50          -> (50, 1, 1, 4)
+    """
+    expr = rule.match_expr.lower()
+
+    # Count pattern conditions (each pattern function adds specificity)
+    pattern_funcs = ['contains(', 'regex(', 'normalized(', 'startswith(', 'fuzzy(', 'anyof(']
+    pattern_count = sum(expr.count(f) for f in pattern_funcs)
+
+    # Count field constraints (amount, date, month, etc.)
+    field_keywords = ['amount', 'date', 'month', 'year', 'day', 'weekday', 'source', 'field.']
+    field_count = sum(1 for kw in field_keywords if kw in expr)
+
+    # Extract pattern text length (rough measure of specificity)
+    pattern_length = _extract_pattern_length(rule.match_expr)
+
+    return (rule.priority, pattern_count, field_count, pattern_length)
+
+
+def _extract_pattern_length(match_expr: str) -> int:
+    """Extract total length of pattern strings in a match expression."""
+    import re
+    # Find all quoted strings in the expression
+    strings = re.findall(r'"([^"]*)"', match_expr)
+    strings += re.findall(r"'([^']*)'", match_expr)
+    return sum(len(s) for s in strings)
 
 
 class MerchantParseError(Exception):
@@ -213,6 +265,14 @@ class MerchantEngine:
                     if tag:
                         tags.add(tag)
                     current_rule['tags'] = tags
+                elif key == 'priority':
+                    try:
+                        current_rule['priority'] = int(value)
+                    except ValueError:
+                        raise MerchantParseError(
+                            f"Invalid priority value: {value} (must be integer)",
+                            line_num, line
+                        )
                 else:
                     raise MerchantParseError(
                         f"Unknown property: {key}", line_num, line
@@ -285,6 +345,7 @@ class MerchantEngine:
             subcategory=rule_data.get('subcategory', ''),
             merchant=rule_data.get('merchant', ''),
             tags=rule_data.get('tags', set()),
+            priority=rule_data.get('priority', 50),
             line_number=line_number,
             let_bindings=let_bindings,
             fields=fields,
@@ -414,9 +475,10 @@ class MerchantEngine:
         """
         Match a transaction against all rules.
 
-        Two-pass evaluation:
-        1. Find first categorization rule that matches (sets merchant/category/subcategory)
-        2. Collect tags from ALL matching rules (including tag-only rules)
+        All-rules-match evaluation:
+        1. Evaluate ALL rules and collect matches
+        2. Resolve merchant/category/subcategory independently by specificity
+        3. Collect tags from ALL matching rules
 
         Args:
             transaction: Transaction dict with description, amount, date, etc.
@@ -426,11 +488,13 @@ class MerchantEngine:
         all_tags: Set[str] = set()
         tag_sources: Dict[str, Dict] = {}
 
+        # Collect all matching rules with their specificity and evaluated variables
+        matching_rules: List[Tuple[MerchantRule, Tuple[int, int, int, int], Dict]] = []
+
         # Evaluate global variables for this transaction
         global_variables = self._evaluate_variables(transaction, data_sources)
 
-        # Pass 1: Find categorization (first match wins)
-        # Pass 2: Collect all tags (runs through all rules)
+        # Evaluate ALL rules
         for rule in self.rules:
             try:
                 # Evaluate rule-level let bindings (can reference global variables)
@@ -449,28 +513,49 @@ class MerchantEngine:
                 continue
 
             if matches:
+                specificity = calculate_specificity(rule)
+                matching_rules.append((rule, specificity, variables))
+
                 # Collect tags from ALL matching rules (resolve dynamic expressions)
                 resolved_tags = self._resolve_tags(rule, transaction, variables, data_sources)
                 for tag in resolved_tags:
                     if tag not in all_tags:
                         all_tags.add(tag)
-                        # Track which rule added this tag (first rule wins)
                         tag_sources[tag] = {'rule': rule.name, 'pattern': rule.match_expr}
                 result.tag_rules.append(rule)
 
-                # Categorization: first rule with category wins
-                if not result.matched and rule.is_categorization_rule:
-                    result.matched = True
-                    result.merchant = rule.merchant
-                    result.category = rule.category
-                    result.subcategory = rule.subcategory
-                    result.matched_rule = rule
+        # Store all matching rules
+        result.all_matching_rules = [r for r, _, _ in matching_rules]
 
-                    # Evaluate extra fields for the matching categorization rule
-                    if rule.fields:
-                        result.extra_fields = self._evaluate_fields(
-                            rule, transaction, variables, data_sources
-                        )
+        # Resolve each field independently by specificity (highest wins)
+        if matching_rules:
+            # Merchant: most specific rule that sets merchant
+            merchant_rules = [(r, s, v) for r, s, v in matching_rules if r.has_merchant]
+            if merchant_rules:
+                winner = max(merchant_rules, key=lambda x: x[1])
+                result.merchant = winner[0].merchant
+                result.merchant_rule = winner[0]
+
+            # Category: most specific rule that sets category
+            category_rules = [(r, s, v) for r, s, v in matching_rules if r.is_categorization_rule]
+            if category_rules:
+                winner = max(category_rules, key=lambda x: x[1])
+                result.matched = True
+                result.category = winner[0].category
+                result.matched_rule = winner[0]
+
+                # Evaluate extra fields for the category winner
+                if winner[0].fields:
+                    result.extra_fields = self._evaluate_fields(
+                        winner[0], transaction, winner[2], data_sources
+                    )
+
+            # Subcategory: most specific rule that sets subcategory
+            subcategory_rules = [(r, s, v) for r, s, v in matching_rules if r.has_subcategory]
+            if subcategory_rules:
+                winner = max(subcategory_rules, key=lambda x: x[1])
+                result.subcategory = winner[0].subcategory
+                result.subcategory_rule = winner[0]
 
         result.tags = all_tags
         result.tag_sources = tag_sources

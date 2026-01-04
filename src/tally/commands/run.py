@@ -192,18 +192,20 @@ def cmd_run(args):
         print(export_markdown(stats, verbose=verbose, category_filter=category_filter, currency_format=currency_format))
     elif output_format == 'summary' or args.summary:
         # Text summary only (no HTML)
+        group_by = getattr(args, 'group_by', 'merchant')
         if stats.get('sections'):
             print_sections_summary(stats, year=year, currency_format=currency_format, only_filter=only_filter)
         else:
-            print_summary(stats, year=year, currency_format=currency_format)
+            print_summary(stats, year=year, currency_format=currency_format, group_by=group_by)
     else:
         # HTML output (default)
         # Print summary first
+        group_by = getattr(args, 'group_by', 'merchant')
         if not args.quiet:
             if stats.get('sections'):
                 print_sections_summary(stats, year=year, currency_format=currency_format, only_filter=only_filter)
             else:
-                print_summary(stats, year=year, currency_format=currency_format)
+                print_summary(stats, year=year, currency_format=currency_format, group_by=group_by)
 
         # Determine output path
         if args.output:

@@ -104,6 +104,8 @@ const MerchantSection = defineComponent({
         creditMode: { type: Boolean, default: false },
         // Category mode adds % column and different formatting
         categoryMode: { type: Boolean, default: false },
+        // Subcategory mode: rows are subcategories, not merchants
+        subcategoryMode: { type: Boolean, default: false },
         categoryTotal: { type: Number, default: 0 },
         grandTotal: { type: Number, default: 0 },
         grossSpending: { type: Number, default: 0 },
@@ -168,9 +170,9 @@ const MerchantSection = defineComponent({
                         <thead>
                             <tr>
                                 <th @click.stop="toggleSort(sectionKey, 'merchant')"
-                                    :class="getSortClass('merchant')">{{ creditMode ? 'Source' : 'Merchant' }}</th>
+                                    :class="getSortClass('merchant')">{{ creditMode ? 'Source' : (subcategoryMode ? 'Subcategory' : 'Merchant') }}</th>
                                 <th @click.stop="toggleSort(sectionKey, 'subcategory')"
-                                    :class="getSortClass('subcategory')">{{ categoryMode ? 'Subcategory' : 'Category' }}</th>
+                                    :class="getSortClass('subcategory')">{{ subcategoryMode ? 'Merchants' : (categoryMode ? 'Subcategory' : 'Category') }}</th>
                                 <!-- Category mode: Count then Tags; Other modes: Tags then Count -->
                                 <th v-if="categoryMode" @click.stop="toggleSort(sectionKey, 'count')"
                                     :class="getSortClass('count')">Count</th>
@@ -191,7 +193,7 @@ const MerchantSection = defineComponent({
                                     @click="toggleExpand(item.id || idx)">
                                     <td class="merchant" :class="{ clickable: categoryMode }">
                                         <span class="chevron">{{ isExpanded(item.id || idx) ? '▼' : '▶' }}</span>
-                                        <span class="merchant-name" @click.stop="categoryMode ? addFilter(item.id, 'merchant', item.displayName) : null">
+                                        <span class="merchant-name" @click.stop="categoryMode ? addFilter(item.id, subcategoryMode ? 'subcategory' : 'merchant', item.displayName) : null">
                                             {{ item.displayName || item.merchant }}
                                         </span>
                                         <span v-if="item.matchInfo || item.viewInfo" class="match-info-trigger"
@@ -242,9 +244,21 @@ const MerchantSection = defineComponent({
                                             </span>
                                         </span>
                                     </td>
-                                    <td class="category" :class="{ clickable: categoryMode }"
-                                        @click.stop="categoryMode && addFilter(item.subcategory, 'subcategory')">
-                                        {{ item.subcategory }}
+                                    <td class="category" :class="{ clickable: categoryMode && !subcategoryMode }"
+                                        @click.stop="categoryMode && !subcategoryMode && addFilter(item.subcategory, 'subcategory')">
+                                        <span v-if="subcategoryMode && item.merchants" class="merchant-list-trigger"
+                                              @click.stop="togglePopup($event)">
+                                            {{ item.subcategory }}
+                                            <span class="match-info-popup">
+                                                <button class="popup-close" @click="closePopup($event)">&times;</button>
+                                                <div class="popup-header">Merchants</div>
+                                                <div v-for="m in item.merchants" :key="m.id" class="popup-row">
+                                                    <span class="popup-label">{{ m.displayName }}</span>
+                                                    <span class="popup-value">{{ formatCurrency(m.filteredTotal) }}</span>
+                                                </div>
+                                            </span>
+                                        </span>
+                                        <span v-else>{{ item.subcategory }}</span>
                                     </td>
                                     <!-- Category mode: Count then Tags; Other modes: Tags then Count -->
                                     <td v-if="categoryMode" data-testid="merchant-count">{{ item.filteredCount || item.count }}</td>
@@ -468,6 +482,7 @@ createApp({
         const chartsCollapsed = ref(false);
         const helpCollapsed = ref(true);
         const currentView = ref('category'); // 'category' or 'section'
+        const groupByMode = ref('merchant'); // 'merchant' or 'subcategory'
         const sortConfig = reactive({}); // { 'cat:Food': { column: 'total', dir: 'desc' } }
 
         // Chart refs
@@ -651,6 +666,75 @@ createApp({
                     result[catName] = category;
                 }
             }
+            return result;
+        });
+
+        // Subcategory-grouped view: same data but grouped by subcategory instead of merchant
+        const subcategoryGroupedView = computed(() => {
+            const result = {};
+            const sortKeys = Object.keys(sortConfig);
+
+            for (const [catName, category] of Object.entries(positiveCategoryView.value)) {
+                const key = 'cat:' + catName;
+                const cfg = sortConfig[key] || { column: 'total', dir: 'desc' };
+
+                // Build subcategory array from filteredSubcategories
+                const allSubcategories = [];
+                for (const [subName, subcat] of Object.entries(category.filteredSubcategories || {})) {
+                    // Collect all merchants in this subcategory
+                    const merchants = [];
+                    for (const [merchantId, merchant] of Object.entries(subcat.filteredMerchants || {})) {
+                        merchants.push({
+                            id: merchantId,
+                            ...merchant
+                        });
+                    }
+
+                    // Sort merchants within subcategory by total
+                    merchants.sort((a, b) => b.filteredTotal - a.filteredTotal);
+
+                    allSubcategories.push({
+                        id: subName,
+                        displayName: subName,
+                        subcategory: `${merchants.length} merchant${merchants.length !== 1 ? 's' : ''}`,
+                        merchants: merchants,
+                        filteredTotal: subcat.filteredTotal,
+                        filteredCount: merchants.reduce((sum, m) => sum + (m.filteredCount || 0), 0),
+                        // Flatten all transactions for the subcategory
+                        filteredTxns: merchants.flatMap(m => m.filteredTxns || []),
+                        // Collect all unique tags
+                        tags: [...new Set(merchants.flatMap(m => m.tags || []))]
+                    });
+                }
+
+                // Sort subcategories
+                allSubcategories.sort((a, b) => {
+                    let vA, vB;
+                    switch (cfg.column) {
+                        case 'merchant':
+                            vA = a.displayName.toLowerCase();
+                            vB = b.displayName.toLowerCase();
+                            break;
+                        case 'count':
+                            vA = a.filteredCount;
+                            vB = b.filteredCount;
+                            break;
+                        default:
+                            vA = a.filteredTotal;
+                            vB = b.filteredTotal;
+                    }
+                    if (typeof vA === 'string') {
+                        return cfg.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+                    }
+                    return cfg.dir === 'asc' ? vA - vB : vB - vA;
+                });
+
+                result[catName] = {
+                    ...category,
+                    sortedSubcategories: allSubcategories
+                };
+            }
+
             return result;
         });
 
@@ -1925,12 +2009,12 @@ createApp({
             // State
             activeFilters, expandedMerchants, extraFieldMatches, collapsedSections, searchQuery,
             showAutocomplete, autocompleteIndex, isScrolled, isDarkTheme, chartsCollapsed, helpCollapsed,
-            currentView, sortConfig,
+            currentView, groupByMode, sortConfig,
             // Refs
             monthlyChart, categoryPieChart, categoryByMonthChart,
             // Computed
             spendingData, title, subtitle,
-            visibleSections, filteredCategoryView, positiveCategoryView, creditMerchants, filteredSectionView, hasSections,
+            visibleSections, filteredCategoryView, positiveCategoryView, subcategoryGroupedView, creditMerchants, filteredSectionView, hasSections,
             sectionTotals, grandTotal, grossSpending, creditsTotal, uncategorizedTotal,
             numFilteredMonths, filteredAutocomplete, availableMonths,
             categoryColorMap, tagColor,

@@ -11,6 +11,7 @@ Run: playwright install chromium
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import warnings
 from typing import TYPE_CHECKING
@@ -475,26 +476,21 @@ class TestEdgeCasesAndCalculations:
     # Credits/Refunds Section Tests
     # -------------------------------------------------------------------------
 
-    def test_credits_section_exists(self, page: Page, edge_case_report_path):
-        """Credits section appears when there are negative-total merchants."""
+    def test_credits_shown_in_cashflow_summary(self, page: Page, edge_case_report_path):
+        """Credits are shown in the cash flow summary card."""
         page.goto(f"file://{edge_case_report_path}")
-        # The credits section should be visible
-        expect(page.get_by_test_id("section-credits")).to_be_visible()
+        # Credits should appear in cash flow breakdown
+        cashflow_card = page.get_by_test_id("cashflow-card")
+        credits_item = cashflow_card.locator(".breakdown-item", has_text="Credits")
+        expect(credits_item).to_be_visible()
 
-    def test_credits_total_is_correct(self, page: Page, edge_case_report_path):
-        """Credits section shows correct total (sum of refunds)."""
+    def test_credits_amount_positive_in_summary(self, page: Page, edge_case_report_path):
+        """Credits are displayed as positive amounts in the summary card."""
         page.goto(f"file://{edge_case_report_path}")
-        # Refunds: Amazon Refund -$100 + Target Refund -$50 = $150 shown as +$150
-        credits_section = page.get_by_test_id("section-credits")
-        expect(credits_section.locator(".section-total")).to_contain_text("+$150")
-
-    def test_refund_merchants_in_credits(self, page: Page, edge_case_report_path):
-        """Merchants with net negative totals appear in credits section."""
-        page.goto(f"file://{edge_case_report_path}")
-        credits_section = page.get_by_test_id("section-credits")
-        # Both refund merchants should be in credits (use .first to avoid strict mode)
-        expect(credits_section.locator(".merchant-name", has_text="Amazon Refund").first).to_be_visible()
-        expect(credits_section.locator(".merchant-name", has_text="Target Refund").first).to_be_visible()
+        # Credits should show with + prefix (refunds reduce spending)
+        cashflow_card = page.get_by_test_id("cashflow-card")
+        credits_value = cashflow_card.locator(".breakdown-item", has_text="Credits").locator(".value")
+        expect(credits_value).to_contain_text("+")
 
     # -------------------------------------------------------------------------
     # Cash Flow Calculation Tests
@@ -1394,3 +1390,371 @@ class TestCurrencyFormatting:
         # No tick should contain $ symbol
         has_dollar = any('$' in str(tick) for tick in ticks if tick)
         assert not has_dollar, f"Found $ in chart ticks, expected £: {ticks}"
+
+
+# =============================================================================
+# Category 5: Grouping Toggle Tests
+# =============================================================================
+
+class TestGroupingToggle:
+    """Tests for the merchant/subcategory grouping toggle."""
+
+    def test_group_toggle_exists(self, page: Page, report_path):
+        """Group toggle buttons exist in category view."""
+        page.goto(f"file://{report_path}")
+        # The view toggle should be visible (unified toggle with Merchant/Subcategory/View buttons)
+        view_toggle = page.locator(".view-toggle")
+        expect(view_toggle).to_be_visible()
+
+    def test_merchant_mode_is_default(self, page: Page, report_path):
+        """Merchant grouping is the default mode."""
+        page.goto(f"file://{report_path}")
+        # The "Merchant" button should be active by default
+        merchant_btn = page.locator(".view-toggle button", has_text="Merchant")
+        expect(merchant_btn).to_have_class(re.compile(r"active"))
+
+    def test_toggle_to_subcategory_mode(self, page: Page, report_path):
+        """Clicking Subcategory button switches to subcategory grouping."""
+        page.goto(f"file://{report_path}")
+
+        # Click subcategory button
+        subcategory_btn = page.locator(".view-toggle button", has_text="Subcategory")
+        subcategory_btn.click()
+
+        # Subcategory button should now be active
+        expect(subcategory_btn).to_have_class(re.compile(r"active"))
+
+        # Merchant button should not be active
+        merchant_btn = page.locator(".view-toggle button", has_text="Merchant")
+        expect(merchant_btn).not_to_have_class(re.compile(r"active"))
+
+    def test_subcategory_mode_shows_subcategories(self, page: Page, report_path):
+        """In subcategory mode, rows show subcategory names."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        subcategory_btn = page.locator(".view-toggle button", has_text="Subcategory")
+        subcategory_btn.click()
+
+        # Should see subcategory names in first column (Online, Grocery, etc.)
+        # The Shopping category should have "Online" subcategory
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        expect(shopping_section.locator(".merchant-name", has_text="Online")).to_be_visible()
+
+    def test_toggle_back_to_merchant_mode(self, page: Page, report_path):
+        """Can toggle back to merchant mode."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        subcategory_btn = page.locator(".view-toggle button", has_text="Subcategory")
+        subcategory_btn.click()
+
+        # Switch back to merchant mode
+        merchant_btn = page.locator(".view-toggle button", has_text="Merchant")
+        merchant_btn.click()
+
+        # Merchant button should be active
+        expect(merchant_btn).to_have_class(re.compile(r"active"))
+
+        # Should see merchant names again
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        expect(shopping_section.locator(".merchant-name", has_text="Amazon")).to_be_visible()
+
+    def test_subcategory_header_shows_merchants_column(self, page: Page, report_path):
+        """In subcategory mode, column header shows 'Merchants' instead of 'Subcategory'."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        subcategory_btn = page.locator(".view-toggle button", has_text="Subcategory")
+        subcategory_btn.click()
+
+        # The second column header should say "Merchants"
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        header = shopping_section.locator("thead th").nth(1)
+        expect(header).to_contain_text("Merchants")
+
+    def test_merchant_header_shows_subcategory_column(self, page: Page, report_path):
+        """In merchant mode, column header shows 'Subcategory'."""
+        page.goto(f"file://{report_path}")
+
+        # Should be in merchant mode by default
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        header = shopping_section.locator("thead th").nth(1)
+        expect(header).to_contain_text("Subcategory")
+
+    def test_subcategory_row_expands_to_show_transactions(self, page: Page, report_path):
+        """Clicking a subcategory row expands to show transactions."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Click on "Online" subcategory in Shopping to expand
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        online_row = shopping_section.locator("tr", has_text="Online")
+        online_row.click()
+
+        # Should see transaction rows (with txn-row class)
+        expect(shopping_section.locator(".txn-row").first).to_be_visible()
+
+    def test_subcategory_mode_shows_merchant_count(self, page: Page, report_path):
+        """Subcategory rows show merchant count."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Online subcategory should show "1 merchant"
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        online_row = shopping_section.locator("tr", has_text="Online")
+        expect(online_row).to_contain_text("1 merchant")
+
+    def test_subcategory_filter_adds_correct_type(self, page: Page, report_path):
+        """Clicking subcategory name adds subcategory filter, not merchant filter."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Click on the subcategory name (first cell) in Online row
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        online_name = shopping_section.locator(".merchant-name", has_text="Online")
+        online_name.click()
+
+        # Should have a subcategory filter chip (class contains 'subcategory')
+        filter_chip = page.locator(".filter-chip.subcategory")
+        expect(filter_chip).to_be_visible()
+        expect(filter_chip).to_contain_text("Online")
+
+    def test_merchant_popup_in_subcategory_mode(self, page: Page, report_path):
+        """Clicking merchant count shows popup with merchant list."""
+        page.goto(f"file://{report_path}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Click on "1 merchant" in the second column
+        shopping_section = page.get_by_test_id("section-cat-Shopping")
+        merchant_trigger = shopping_section.locator(".merchant-list-trigger").first
+        merchant_trigger.click()
+
+        # Popup should appear with merchant name (use .visible class to find the open one)
+        popup = page.locator(".match-info-popup.visible")
+        expect(popup).to_be_visible()
+        expect(popup.locator(".popup-header")).to_contain_text("Merchants")
+
+
+# =============================================================================
+# Category 6: Missing Subcategory Tests
+# =============================================================================
+
+@pytest.fixture(scope="module")
+def report_with_missing_subcategories(tmp_path_factory):
+    """Generate a report where some merchants have no subcategory defined.
+
+    Tests the 'Other' fallback behavior in subcategory grouping mode.
+    """
+    tmp_dir = tmp_path_factory.mktemp("missing_subcategory_test")
+    config_dir = tmp_dir / "config"
+    data_dir = tmp_dir / "data"
+    output_dir = tmp_dir / "output"
+
+    config_dir.mkdir()
+    data_dir.mkdir()
+    output_dir.mkdir()
+
+    # Create test CSV
+    csv_content = """Date,Description,Amount
+01/05/2024,COSTCO WHOLESALE,150.00
+01/10/2024,SAFEWAY STORE,75.50
+01/12/2024,AMAZON MARKETPLACE,49.99
+01/15/2024,TARGET STORE,89.00
+01/18/2024,BESTBUY ELECTRONICS,299.99
+"""
+    (data_dir / "transactions.csv").write_text(csv_content)
+
+    # Create settings
+    settings_content = """year: 2024
+
+data_sources:
+  - name: Test
+    file: data/transactions.csv
+    format: "{date},{description},{amount}"
+    has_header: true
+
+merchants_file: config/merchants.rules
+"""
+    (config_dir / "settings.yaml").write_text(settings_content)
+
+    # Create merchants rules - some WITHOUT subcategory
+    rules_content = """[Costco]
+match: normalized("COSTCO")
+category: Groceries
+subcategory: Warehouse
+
+[Safeway]
+match: normalized("SAFEWAY")
+category: Groceries
+subcategory: Supermarket
+
+[Amazon]
+match: normalized("AMAZON")
+category: Retail
+
+[Target]
+match: normalized("TARGET")
+category: Retail
+subcategory: Department Store
+
+[Best Buy]
+match: normalized("BESTBUY")
+category: Electronics
+"""
+    (config_dir / "merchants.rules").write_text(rules_content)
+
+    # Generate the report
+    report_file = output_dir / "report.html"
+    result = subprocess.run(
+        ["uv", "run", "tally", "run", "-o", str(report_file), str(config_dir)],
+        capture_output=True,
+        text=True,
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+
+    if result.returncode != 0:
+        pytest.fail(f"Failed to generate report: {result.stderr}")
+
+    return str(report_file)
+
+
+class TestMissingSubcategory:
+    """Tests for merchants without subcategories."""
+
+    def test_missing_subcategory_shows_other(self, page: Page, report_with_missing_subcategories):
+        """Merchants without subcategory are grouped as 'Other' in subcategory mode."""
+        page.goto(f"file://{report_with_missing_subcategories}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Electronics section (Best Buy has no subcategory)
+        electronics_section = page.get_by_test_id("section-cat-Electronics")
+        expect(electronics_section.locator(".merchant-name", has_text="Other")).to_be_visible()
+
+    def test_missing_subcategory_mixed_category(self, page: Page, report_with_missing_subcategories):
+        """Category with mixed subcategories shows both named and 'Other'."""
+        page.goto(f"file://{report_with_missing_subcategories}")
+
+        # Switch to subcategory mode
+        page.locator(".view-toggle button", has_text="Subcategory").click()
+
+        # Retail has Target (Department Store) and Amazon (no subcategory -> Other)
+        retail_section = page.get_by_test_id("section-cat-Retail")
+        expect(retail_section.locator(".merchant-name", has_text="Department Store")).to_be_visible()
+        expect(retail_section.locator(".merchant-name", has_text="Other")).to_be_visible()
+
+    def test_merchant_mode_shows_empty_subcategory(self, page: Page, report_with_missing_subcategories):
+        """In merchant mode, missing subcategory shows as empty cell."""
+        page.goto(f"file://{report_with_missing_subcategories}")
+
+        # Should be in merchant mode by default
+        # Best Buy row should have an empty subcategory cell
+        electronics_section = page.get_by_test_id("section-cat-Electronics")
+        bestbuy_row = electronics_section.locator("tr", has_text="Best Buy")
+        # Second cell (subcategory) should be empty
+        subcategory_cell = bestbuy_row.locator("td").nth(1)
+        expect(subcategory_cell).to_have_text("")
+
+
+# =============================================================================
+# Category 7: Credits Display Tests
+# =============================================================================
+
+@pytest.fixture(scope="module")
+def report_with_credits(tmp_path_factory):
+    """Generate a report with credits/refunds to test summary display."""
+    tmp_dir = tmp_path_factory.mktemp("credits_test")
+    config_dir = tmp_dir / "config"
+    data_dir = tmp_dir / "data"
+    output_dir = tmp_dir / "output"
+
+    config_dir.mkdir()
+    data_dir.mkdir()
+    output_dir.mkdir()
+
+    # Create test CSV with negative amounts (credits)
+    csv_content = """Date,Description,Amount
+01/05/2024,AMAZON MARKETPLACE,45.99
+01/10/2024,AMAZON REFUND,-25.00
+01/15/2024,WHOLE FOODS,125.50
+01/20/2024,STORE CREDIT,-15.00
+"""
+    (data_dir / "transactions.csv").write_text(csv_content)
+
+    # Create settings
+    settings_content = """year: 2024
+
+data_sources:
+  - name: Test
+    file: data/transactions.csv
+    format: "{date},{description},{amount}"
+    has_header: true
+
+merchants_file: config/merchants.rules
+"""
+    (config_dir / "settings.yaml").write_text(settings_content)
+
+    # Create merchants rules
+    rules_content = """[Amazon]
+match: normalized("AMAZON")
+category: Shopping
+subcategory: Online
+
+[Whole Foods]
+match: normalized("WHOLE FOODS")
+category: Food
+subcategory: Grocery
+
+[Store Credit]
+match: normalized("STORE CREDIT")
+category: Shopping
+subcategory: Credits
+"""
+    (config_dir / "merchants.rules").write_text(rules_content)
+
+    # Generate the report
+    report_file = output_dir / "report.html"
+    result = subprocess.run(
+        ["uv", "run", "tally", "run", "-o", str(report_file), str(config_dir)],
+        capture_output=True,
+        text=True,
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+
+    if result.returncode != 0:
+        pytest.fail(f"Failed to generate report: {result.stderr}")
+
+    return str(report_file)
+
+
+class TestCreditsDisplay:
+    """Tests for credits/refunds display in summary cards."""
+
+    def test_credits_shown_in_cash_flow(self, page: Page, report_with_credits):
+        """Credits are displayed in the Cash Flow summary card."""
+        page.goto(f"file://{report_with_credits}")
+
+        # Cash flow card should show Credits line
+        cashflow_card = page.get_by_test_id("cashflow-card")
+        expect(cashflow_card.locator(".breakdown-item", has_text="Credits")).to_be_visible()
+
+    def test_credits_positive_display(self, page: Page, report_with_credits):
+        """Credits are shown as positive amounts with + prefix."""
+        page.goto(f"file://{report_with_credits}")
+
+        # Find the credits line in cash flow
+        cashflow_card = page.get_by_test_id("cashflow-card")
+        credits_item = cashflow_card.locator(".breakdown-item", has_text="Credits")
+        credits_value = credits_item.locator(".value")
+        # Should show positive amount (the $40 in credits)
+        expect(credits_value).to_contain_text("+")

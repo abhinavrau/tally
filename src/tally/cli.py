@@ -929,6 +929,12 @@ def main():
         action='store_true',
         help='Migrate merchant_categories.csv to new .rules format (non-interactive)'
     )
+    up_parser.add_argument(
+        '--group-by',
+        choices=['merchant', 'subcategory'],
+        default='merchant',
+        help='Group output by merchant (default) or subcategory'
+    )
 
     # run subcommand (deprecated alias for 'up' - hidden from help)
     run_parser = subparsers.add_parser('run')
