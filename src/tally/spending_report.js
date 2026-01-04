@@ -153,7 +153,7 @@ const MerchantSection = defineComponent({
                         <span class="section-monthly">{{ formatCurrency(totalAmount / numMonths) }}/mo</span> ·
                         <span class="section-ytd">{{ formatCurrency(totalAmount) }}</span>
                         <span class="section-pct" v-if="typeTotals">
-                            <span v-if="totalAmount > 0 && totalUnfilteredSpending > 0">({{ formatPct(totalAmount, totalUnfilteredSpending) }})</span>
+                            <span v-if="typeTotals.spending > 0 && totalUnfilteredSpending > 0">({{ formatPct(typeTotals.spending, totalUnfilteredSpending) }})</span>
                             <span v-if="typeTotals.income > 0 && incomeTotal > 0" class="income-pct">({{ formatPct(typeTotals.income, incomeTotal) }} income)</span>
                             <span v-if="typeTotals.investment > 0 && investmentTotal > 0" class="investment-pct">({{ formatPct(typeTotals.investment, investmentTotal) }} invest)</span>
                         </span>
@@ -199,7 +199,7 @@ const MerchantSection = defineComponent({
                                         </span>
                                         <span v-if="item.matchInfo || item.viewInfo" class="match-info-trigger"
                                                       @click.stop="togglePopup($event)">info
-                                            <span class="match-info-popup" ref="popup">
+                                            <span class="match-info-popup" ref="popup" @click.stop>
                                                 <button class="popup-close" @click="closePopup($event)">&times;</button>
                                                 <div class="popup-header">Why This Matched</div>
                                                 <template v-if="item.matchInfo">
@@ -250,7 +250,7 @@ const MerchantSection = defineComponent({
                                         <span v-if="subcategoryMode && item.merchants" class="merchant-list-trigger"
                                               @click.stop="togglePopup($event)">
                                             {{ item.subcategory }}
-                                            <span class="match-info-popup">
+                                            <span class="match-info-popup" @click.stop>
                                                 <button class="popup-close" @click="closePopup($event)">&times;</button>
                                                 <div class="popup-header">Merchants</div>
                                                 <div v-for="m in item.merchants" :key="m.id" class="popup-row">
@@ -284,7 +284,7 @@ const MerchantSection = defineComponent({
                                                   class="extra-fields-trigger"
                                                   :class="{ 'match-highlight': extraFieldMatches.has(txn.id) }"
                                                   @click.stop="togglePopup($event)">+{{ Object.keys(txn.extra_fields).length }}
-                                                <span class="match-info-popup">
+                                                <span class="match-info-popup" @click.stop>
                                                     <button class="popup-close" @click="closePopup($event)">&times;</button>
                                                     <div class="popup-header">Transaction Details</div>
                                                     <div v-for="(value, key) in txn.extra_fields" :key="key" class="popup-row">
