@@ -5,7 +5,8 @@ Tally 'diag' command - Show diagnostic information about config and rules.
 import os
 import sys
 
-from ..cli import C, find_config_dir
+from ..colors import C
+from ..cli_utils import find_config_dir
 from ..classification import SPECIAL_TAGS
 from ..config_loader import load_config
 from ..merchant_utils import get_all_rules, diagnose_rules, get_transforms

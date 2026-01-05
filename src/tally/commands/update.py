@@ -10,8 +10,7 @@ from .._version import (
     perform_update,
 )
 
-# Import shared utilities
-from ..cli import find_config_dir
+from ..cli_utils import find_config_dir
 from ..migrations import run_migrations
 
 

@@ -2,11 +2,16 @@
 Tally 'discover' command - Find unknown merchants for rule creation.
 """
 
-import os
 import sys
 from collections import defaultdict
 
-from ..cli import C, find_config_dir, _check_deprecated_description_cleaning, _print_deprecation_warnings
+from ..colors import C
+from ..cli_utils import (
+    resolve_config_dir,
+    check_deprecated_description_cleaning,
+    warn_deprecated_parser,
+    print_deprecation_warnings,
+)
 from ..config_loader import load_config
 from ..merchant_utils import get_all_rules, get_transforms
 from ..analyzer import parse_amex, parse_boa, parse_generic_csv
@@ -16,17 +21,7 @@ def cmd_discover(args):
     """Handle the 'discover' subcommand - find unknown merchants for rule creation."""
     import re
 
-    # Determine config directory
-    if args.config:
-        config_dir = os.path.abspath(args.config)
-    else:
-        config_dir = find_config_dir()
-
-    if not config_dir or not os.path.isdir(config_dir):
-        print(f"Error: Config directory not found.", file=sys.stderr)
-        print(f"Looked for: ./config and ./tally/config", file=sys.stderr)
-        print(f"\nRun 'tally init' to create a new budget directory.", file=sys.stderr)
-        sys.exit(1)
+    config_dir = resolve_config_dir(args)
 
     # Load configuration
     try:
@@ -36,7 +31,7 @@ def cmd_discover(args):
         sys.exit(1)
 
     # Check for deprecated settings
-    _check_deprecated_description_cleaning(config)
+    check_deprecated_description_cleaning(config)
 
     data_sources = config.get('data_sources', [])
     rule_mode = config.get('rule_mode', 'first_match')
@@ -77,12 +72,10 @@ def cmd_discover(args):
 
         try:
             if parser_type == 'amex':
-                from ..cli import _warn_deprecated_parser
-                _warn_deprecated_parser(source.get('name', 'AMEX'), 'amex', source['file'])
+                warn_deprecated_parser(source.get('name', 'AMEX'), 'amex', source['file'])
                 txns = parse_amex(filepath, rules)
             elif parser_type == 'boa':
-                from ..cli import _warn_deprecated_parser
-                _warn_deprecated_parser(source.get('name', 'BOA'), 'boa', source['file'])
+                warn_deprecated_parser(source.get('name', 'BOA'), 'boa', source['file'])
                 txns = parse_boa(filepath, rules)
             elif parser_type == 'generic' and format_spec:
                 txns = parse_generic_csv(filepath, format_spec, rules,
@@ -198,7 +191,7 @@ def cmd_discover(args):
             print(f"{C.RESET}")
             print()
 
-    _print_deprecation_warnings(config)
+    print_deprecation_warnings(config)
 
 
 def suggest_pattern(description):

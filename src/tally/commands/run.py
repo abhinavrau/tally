@@ -5,8 +5,16 @@ Tally 'run' command - Analyze transactions and generate reports.
 import os
 import sys
 
+from ..colors import C
+from ..cli_utils import (
+    resolve_config_dir,
+    check_deprecated_description_cleaning,
+    warn_deprecated_parser,
+    print_deprecation_warnings,
+)
 from ..config_loader import load_config, load_supplemental_sources
 from ..merchant_utils import get_transforms
+from ..migrations import check_merchant_migration
 from ..analyzer import (
     parse_amex,
     parse_boa,
@@ -17,31 +25,10 @@ from ..analyzer import (
     write_summary_file_vue,
 )
 
-# Import shared utilities from parent cli module
-from ..cli import (
-    C,
-    find_config_dir,
-    _check_deprecated_description_cleaning,
-    _check_merchant_migration,
-    _warn_deprecated_parser,
-    _print_deprecation_warnings,
-)
-
 
 def cmd_run(args):
     """Handle the 'run' subcommand."""
-    # Determine config directory
-    if args.config:
-        config_dir = os.path.abspath(args.config)
-    else:
-        # Auto-detect config directory (supports both old and new layouts)
-        config_dir = find_config_dir()
-
-    if not config_dir or not os.path.isdir(config_dir):
-        print(f"Error: Config directory not found.", file=sys.stderr)
-        print(f"Looked for: ./config and ./tally/config", file=sys.stderr)
-        print(f"\nRun 'tally init' to create a new budget directory.", file=sys.stderr)
-        sys.exit(1)
+    config_dir = resolve_config_dir(args)
 
     # Load configuration
     try:
@@ -51,7 +38,7 @@ def cmd_run(args):
         sys.exit(1)
 
     # Check for deprecated settings
-    _check_deprecated_description_cleaning(config)
+    check_deprecated_description_cleaning(config)
 
     year = config.get('year', 2025)
     data_sources = config.get('data_sources', [])
@@ -80,7 +67,7 @@ def cmd_run(args):
         print()
 
     # Load merchant rules (with migration check for CSV -> .rules)
-    rules = _check_merchant_migration(config, config_dir, args.quiet, getattr(args, 'migrate', False))
+    rules = check_merchant_migration(config, config_dir, args.quiet, getattr(args, 'migrate', False))
 
     # Load supplemental data sources for cross-source queries
     supplemental_data = load_supplemental_sources(config, config_dir)
@@ -113,10 +100,10 @@ def cmd_run(args):
 
         try:
             if parser_type == 'amex':
-                _warn_deprecated_parser(source.get('name', 'AMEX'), 'amex', source['file'])
+                warn_deprecated_parser(source.get('name', 'AMEX'), 'amex', source['file'])
                 txns = parse_amex(filepath, rules)
             elif parser_type == 'boa':
-                _warn_deprecated_parser(source.get('name', 'BOA'), 'boa', source['file'])
+                warn_deprecated_parser(source.get('name', 'BOA'), 'boa', source['file'])
                 txns = parse_boa(filepath, rules)
             elif parser_type == 'generic' and format_spec:
                 txns = parse_generic_csv(filepath, format_spec, rules,
@@ -231,4 +218,4 @@ def cmd_run(args):
             clickable_path = f"\033]8;;{file_url}\033\\{output_path}\033]8;;\033\\"
             print(f"\nHTML report: {clickable_path}")
 
-    _print_deprecation_warnings(config)
+    print_deprecation_warnings(config)

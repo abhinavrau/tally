@@ -6,9 +6,9 @@ import os
 import sys
 
 from ..colors import C, supports_color
+from ..cli_utils import init_config
 from ..migrations import migrate_csv_to_rules
 from ..templates import STARTER_SETTINGS, STARTER_MERCHANTS, STARTER_VIEWS
-from ..cli import init_config
 
 
 def cmd_init(args):

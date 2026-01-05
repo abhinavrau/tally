@@ -4,10 +4,9 @@ Tally 'workflow' command - Show context-aware workflow instructions for AI agent
 
 import os
 
+from ..colors import C
+from ..cli_utils import find_config_dir
 from ..config_loader import load_config
-
-# Import shared utilities from parent cli module
-from ..cli import C, find_config_dir
 
 
 def cmd_workflow(args):
