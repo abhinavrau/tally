@@ -2,6 +2,7 @@
 Tally 'discover' command - Find unknown merchants for rule creation.
 """
 
+import os
 import sys
 from collections import defaultdict
 
