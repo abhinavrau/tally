@@ -48,12 +48,12 @@ def main():
     up_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     up_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
     up_parser.add_argument(
         '--settings', '-s',
@@ -127,12 +127,12 @@ def main():
     run_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     run_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
     run_parser.add_argument(
         '--settings', '-s',
@@ -217,12 +217,12 @@ def main():
     discover_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     discover_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
     discover_parser.add_argument(
         '--settings', '-s',
@@ -251,12 +251,12 @@ def main():
     diag_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     diag_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
     diag_parser.add_argument(
         '--settings', '-s',
@@ -340,12 +340,12 @@ def main():
     workflow_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     workflow_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
 
     # reference subcommand
@@ -377,12 +377,12 @@ def main():
     update_parser.add_argument(
         'config',
         nargs='?',
-        help='Path to config directory (default: ./config)'
+        help='(deprecated, use --config) Path to config directory'
     )
     update_parser.add_argument(
         '--config', '-c',
         dest='config_dir',
-        help='Path to config directory (alternative to positional argument)'
+        help='Path to config directory (default: ./config)'
     )
     update_parser.add_argument(
         '--check',
