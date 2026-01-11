@@ -6,86 +6,11 @@ Loads settings from YAML config files.
 
 import os
 
+import yaml
+
 from .format_parser import parse_format_string, is_special_parser_type
 from .section_engine import load_sections, SectionParseError
 from .path_utils import resolve_data_source_paths
-
-# Try to import yaml, fall back to simple parsing if not available
-try:
-    import yaml
-    HAS_YAML = True
-except ImportError:
-    HAS_YAML = False
-
-
-def load_yaml_simple(filepath):
-    """Simple YAML parser for basic key-value configs (fallback if PyYAML not installed)."""
-    config = {}
-    current_list_key = None
-    current_list = []
-    current_item = {}
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line in f:
-            # Skip comments and empty lines
-            stripped = line.strip()
-            if not stripped or stripped.startswith('#'):
-                continue
-
-            # Check indentation level
-            indent = len(line) - len(line.lstrip())
-
-            # Handle list items
-            if stripped.startswith('- '):
-                if current_list_key:
-                    if current_item:
-                        current_list.append(current_item)
-                        current_item = {}
-                    # Parse the item
-                    item_content = stripped[2:].strip()
-                    if ':' in item_content:
-                        key, value = item_content.split(':', 1)
-                        current_item[key.strip()] = value.strip()
-                continue
-
-            # Handle nested list item properties
-            if indent > 2 and current_list_key and ':' in stripped:
-                key, value = stripped.split(':', 1)
-                current_item[key.strip()] = value.strip()
-                continue
-
-            # Handle top-level key-value pairs
-            if ':' in stripped and indent == 0:
-                # Save any pending list
-                if current_list_key and current_list:
-                    if current_item:
-                        current_list.append(current_item)
-                    config[current_list_key] = current_list
-                    current_list = []
-                    current_item = {}
-                    current_list_key = None
-
-                key, value = stripped.split(':', 1)
-                key = key.strip()
-                value = value.strip()
-
-                if value:
-                    # Remove quotes if present
-                    if value.startswith('"') and value.endswith('"'):
-                        value = value[1:-1]
-                    config[key] = value
-                else:
-                    # This might be a list
-                    current_list_key = key
-
-    # Save any pending list
-    if current_list_key:
-        if current_item:
-            current_list.append(current_item)
-        if current_list:
-            config[current_list_key] = current_list
-
-    return config
 
 
 def load_settings(config_dir, settings_file='settings.yaml'):
@@ -95,11 +20,8 @@ def load_settings(config_dir, settings_file='settings.yaml'):
     if not os.path.exists(settings_path):
         raise FileNotFoundError(f"Settings file not found: {settings_path}")
 
-    if HAS_YAML:
-        with open(settings_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
-    else:
-        return load_yaml_simple(settings_path)
+    with open(settings_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
 
 
 def resolve_source_format(source, warnings=None):

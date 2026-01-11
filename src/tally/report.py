@@ -10,12 +10,17 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from .explain_utils import explain_pattern, explain_view_filter
+
 # Try to import sentence_transformers for semantic search
 try:
     from sentence_transformers import SentenceTransformer
     EMBEDDINGS_AVAILABLE = True
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
+    SentenceTransformer = None
+
+_EMBEDDINGS_MODEL = None
 
 
 def get_template_dir():
@@ -74,9 +79,11 @@ def generate_embeddings(items):
         return None
 
     print("Generating semantic embeddings...")
-    # Use a small, fast model optimized for semantic similarity
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    embeddings = model.encode(items, show_progress_bar=False)
+    # Use a small, fast model optimized for semantic similarity.
+    global _EMBEDDINGS_MODEL
+    if _EMBEDDINGS_MODEL is None:
+        _EMBEDDINGS_MODEL = SentenceTransformer('all-MiniLM-L6-v2')
+    embeddings = _EMBEDDINGS_MODEL.encode(items, show_progress_bar=False)
     return embeddings.tolist()
 
 
@@ -107,122 +114,6 @@ def write_summary_file_vue(stats, filepath, year=None, currency_format="${amount
     # Get number of months for averaging
     num_months = stats['num_months']
     by_merchant = stats.get('by_merchant', {})
-
-    # Helper to explain a pattern in human-readable form
-    def _explain_pattern(pattern):
-        """Convert a regex/expression pattern to human-readable explanation."""
-        import re
-        if not pattern:
-            return ''
-
-        # Handle expression-style patterns (contains, startswith, etc.)
-        if 'contains(' in pattern.lower():
-            match = re.search(r'contains\(["\']([^"\']+)["\']\)', pattern, re.IGNORECASE)
-            if match:
-                return f'Description contains "{match.group(1)}"'
-
-        if 'startswith(' in pattern.lower():
-            match = re.search(r'startswith\(["\']([^"\']+)["\']\)', pattern, re.IGNORECASE)
-            if match:
-                return f'Description starts with "{match.group(1)}"'
-
-        if 'anyof(' in pattern.lower():
-            match = re.search(r'anyof\(([^)]+)\)', pattern, re.IGNORECASE)
-            if match:
-                terms = [t.strip().strip('"\'') for t in match.group(1).split(',')]
-                if len(terms) <= 3:
-                    return f'Description contains any of: {", ".join(terms)}'
-                return f'Description contains any of: {", ".join(terms[:3])}...'
-
-        # Handle regex patterns
-        parts = []
-
-        # Check for alternation (OR)
-        if '|' in pattern and not pattern.startswith('('):
-            alternatives = pattern.split('|')
-            if len(alternatives) <= 3:
-                terms = [a.replace('.*', ' ... ').replace('\\s', ' ').strip() for a in alternatives]
-                return f'Matches: {" OR ".join(terms)}'
-            else:
-                terms = [a.replace('.*', ' ... ').replace('\\s', ' ').strip() for a in alternatives[:3]]
-                return f'Matches: {" OR ".join(terms)} (+ {len(alternatives) - 3} more)'
-
-        # Check for start anchor
-        if pattern.startswith('^'):
-            pattern = pattern[1:]
-            parts.append('Starts with')
-        else:
-            parts.append('Contains')
-
-        # Check for end anchor
-        end_anchor = pattern.endswith('$')
-        if end_anchor:
-            pattern = pattern[:-1]
-
-        # Clean up common regex syntax for display
-        display = pattern
-        display = display.replace('.*', ' ... ')
-        display = display.replace('.+', ' ... ')
-        display = display.replace('\\s+', ' ')
-        display = display.replace('\\s', ' ')
-        display = display.replace('\\d+', '#')
-        display = display.replace('\\d', '#')
-        display = display.replace('(?!', ' (not followed by ')
-        display = display.replace('(?:', '(')
-        display = display.replace(')', ')')
-
-        parts.append(f'"{display.strip()}"')
-
-        if end_anchor:
-            parts.append('at end')
-
-        return ' '.join(parts)
-
-    # Helper to explain a view filter expression
-    def _explain_view_filter(filter_expr):
-        """Convert a view filter expression to human-readable explanation."""
-        import re
-        if not filter_expr:
-            return ''
-
-        explanations = []
-
-        # Parse common conditions
-        if 'category ==' in filter_expr.lower() or "category='" in filter_expr.lower():
-            match = re.search(r'category\s*==?\s*["\']([^"\']+)["\']', filter_expr, re.IGNORECASE)
-            if match:
-                explanations.append(f'Category is "{match.group(1)}"')
-
-        if 'subcategory ==' in filter_expr.lower() or "subcategory='" in filter_expr.lower():
-            match = re.search(r'subcategory\s*==?\s*["\']([^"\']+)["\']', filter_expr, re.IGNORECASE)
-            if match:
-                explanations.append(f'Subcategory is "{match.group(1)}"')
-
-        if 'tag(' in filter_expr.lower() or 'has_tag(' in filter_expr.lower():
-            matches = re.findall(r'(?:tag|has_tag)\(["\']([^"\']+)["\']\)', filter_expr, re.IGNORECASE)
-            for tag in matches:
-                explanations.append(f'Has tag "{tag}"')
-
-        if 'months >' in filter_expr or 'months>=' in filter_expr:
-            match = re.search(r'months\s*>=?\s*(\d+)', filter_expr)
-            if match:
-                explanations.append(f'Active {match.group(1)}+ months')
-
-        if 'total >' in filter_expr or 'total>=' in filter_expr:
-            match = re.search(r'total\s*>=?\s*(\d+)', filter_expr)
-            if match:
-                explanations.append(f'Total ≥ ${match.group(1)}')
-
-        if 'cv <' in filter_expr or 'cv<=' in filter_expr:
-            match = re.search(r'cv\s*<=?\s*([\d.]+)', filter_expr)
-            if match:
-                explanations.append(f'Coefficient of variation ≤ {match.group(1)}')
-
-        if explanations:
-            return ' AND '.join(explanations)
-
-        # Fallback: return cleaned up version of expression
-        return filter_expr.replace('==', '=').replace('&&', ' and ').replace('||', ' or ')
 
     # Helper function to create merchant IDs
     def make_merchant_id(name):
@@ -260,7 +151,7 @@ def write_summary_file_vue(stats, filepath, year=None, currency_format="${amount
                 match_info_json = {
                     'pattern': pattern,
                     'source': match_info.get('source', ''),
-                    'explanation': _explain_pattern(pattern),
+                    'explanation': explain_pattern(pattern),
                     'assignedMerchant': merchant_name,
                     'assignedCategory': data.get('category', ''),
                     'assignedSubcategory': data.get('subcategory', ''),
@@ -318,7 +209,7 @@ def write_summary_file_vue(stats, filepath, year=None, currency_format="${amount
                 merchant['viewInfo'] = {
                     'viewName': section_name,
                     'filterExpr': view_filter,
-                    'explanation': _explain_view_filter(view_filter) if view_filter else '',
+                    'explanation': explain_view_filter(view_filter) if view_filter else '',
                 }
 
             if merchants:
@@ -479,5 +370,3 @@ def write_summary_file_vue(stats, filepath, year=None, currency_format="${amount
 
     # Write output file
     Path(filepath).write_text(final_html, encoding='utf-8')
-
-

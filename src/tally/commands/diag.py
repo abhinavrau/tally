@@ -89,7 +89,7 @@ def cmd_diag(args):
     if os.path.exists(legacy_csv) and not os.path.exists(merchants_rules):
         config_issues.append(f"Legacy CSV format detected: {os.path.basename(legacy_csv)}")
         print(f"  {C.YELLOW}⚠{C.RESET}  Legacy merchant_categories.csv found")
-        print(f"       Run 'tally run --migrate' to upgrade to .rules format")
+        print(f"       Run 'tally up --migrate' to upgrade to .rules format")
 
     # Check if merchants_file is set in settings
     if config:
@@ -371,7 +371,7 @@ def cmd_diag(args):
             diag = diagnose_rules(rules_path)
             print(f"  Rules loaded: {diag['user_rules_count']}")
             print()
-            print(f"  {C.YELLOW}NOTE: Using legacy CSV format. Run 'tally run --migrate' to upgrade.{C.RESET}")
+            print(f"  {C.YELLOW}NOTE: Using legacy CSV format. Run 'tally up --migrate' to upgrade.{C.RESET}")
 
             if diag['user_rules_errors']:
                 print()

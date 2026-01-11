@@ -127,7 +127,7 @@ def cmd_workflow(args):
         print(f"       {C.YELLOW}READ the Best Practices below first!{C.RESET}")
         print()
         print(f"    {C.DIM}3.{C.RESET} Check progress:")
-        print(f"       {C.GREEN}tally run --summary{C.RESET}")
+        print(f"       {C.GREEN}tally up --summary{C.RESET}")
         print()
         print(f"    {C.YELLOW}{C.BOLD}KEEP GOING UNTIL ALL UNKNOWNS ARE RESOLVED!{C.RESET}")
         print(f"    {C.DIM}Your report is only as good as your rules. Don't stop at 80%.{C.RESET}")
@@ -242,7 +242,7 @@ def cmd_workflow(args):
     print(f"    {C.DIM}  Some banks:  credits positive, debits negative → {{-amount}}{C.RESET}")
     print(f"    {C.DIM}  Others:      all positive with type column     → {{+amount}}{C.RESET}")
     print()
-    print(f"    {C.DIM}Test with:{C.RESET} {C.GREEN}tally run --summary{C.RESET} {C.DIM}(check if totals make sense){C.RESET}")
+    print(f"    {C.DIM}Test with:{C.RESET} {C.GREEN}tally up --summary{C.RESET} {C.DIM}(check if totals make sense){C.RESET}")
 
     section("Common Pitfalls")
     print(f"    {C.DIM}• Amounts inverted? Try {{-amount}} or {{+amount}} in format{C.RESET}")

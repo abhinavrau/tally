@@ -41,7 +41,7 @@ Full documentation is available at **[tallyai.money](https://tallyai.money)**:
 |---------|-------------|
 | `tally init` | Create a new budget folder |
 | `tally workflow` | Show context-aware next steps |
-| `tally run` | Generate HTML spending report |
+| `tally up` | Generate HTML spending report |
 | `tally discover` | Find uncategorized transactions |
 | `tally explain` | Explain merchant classifications |
 | `tally inspect` | Analyze CSV structure |
