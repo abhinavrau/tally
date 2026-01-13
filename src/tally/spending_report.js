@@ -278,14 +278,18 @@ const MerchantSection = defineComponent({
                                     class="txn-row"
                                     :class="{ hidden: !isExpanded(item.id || idx) }">
                                     <td :colspan="totalColSpan">
-                                        <div class="txn-detail" :class="{ 'has-extra': txn.extra_fields && Object.keys(txn.extra_fields).length }">
-                                            <span v-if="txn.extra_fields && Object.keys(txn.extra_fields).length"
+                                        <div class="txn-detail" :class="{ 'has-extra': (txn.extra_fields && Object.keys(txn.extra_fields).length) || txn.original_description }">
+                                            <span v-if="(txn.extra_fields && Object.keys(txn.extra_fields).length) || txn.original_description"
                                                   class="extra-fields-trigger"
                                                   :class="{ 'match-highlight': extraFieldMatches.has(txn.id) }"
-                                                  @click.stop="togglePopup($event)">+{{ Object.keys(txn.extra_fields).length }}
+                                                  @click.stop="togglePopup($event)">+{{ (txn.extra_fields ? Object.keys(txn.extra_fields).length : 0) + (txn.original_description ? 1 : 0) }}
                                                 <span class="match-info-popup" @click.stop>
                                                     <button class="popup-close" @click="closePopup($event)">&times;</button>
                                                     <div class="popup-header">Transaction Details</div>
+                                                    <div v-if="txn.original_description" class="popup-row">
+                                                        <span class="popup-label">Original</span>
+                                                        <span class="popup-value">{{ txn.original_description }}</span>
+                                                    </div>
                                                     <div v-for="(value, key) in txn.extra_fields" :key="key" class="popup-row">
                                                         <span class="popup-label">{{ formatFieldKey(key) }}</span>
                                                         <span v-if="Array.isArray(value)" class="popup-value popup-list">
@@ -296,15 +300,7 @@ const MerchantSection = defineComponent({
                                                 </span>
                                             </span>
                                             <span class="txn-date">{{ formatDate(txn.date) }}</span>
-                                            <span class="txn-desc"><span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span> <span v-html="highlightDescription(txn.description)"></span><span v-if="txn.original_description" class="transform-indicator" @click.stop="togglePopup($event)">✎
-                                                <span class="match-info-popup" @click.stop>
-                                                    <button class="popup-close" @click="closePopup($event)">&times;</button>
-                                                    <div class="popup-header">Original Description</div>
-                                                    <div class="popup-row">
-                                                        <span class="popup-value">{{ txn.original_description }}</span>
-                                                    </div>
-                                                </span>
-                                            </span></span>
+                                            <span class="txn-desc"><span v-if="txn.source" class="txn-source" :class="txn.source.toLowerCase()">{{ txn.source }}</span> <span v-html="highlightDescription(txn.description)"></span></span>
                                             <span class="txn-badges">
                                                 <span v-for="tag in [...(txn.tags || [])].sort()"
                                                       :key="tag"
