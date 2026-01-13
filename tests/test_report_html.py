@@ -2033,7 +2033,7 @@ subcategory: Online
         ["uv", "run", "tally", "run", "-o", str(report_file), str(config_dir)],
         capture_output=True,
         text=True,
-        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        cwd=str(tmp_dir)  # Run from tmp_dir so relative paths in settings work
     )
 
     if result.returncode != 0:
@@ -2053,29 +2053,31 @@ class TestTransformDirective:
         """Transaction with transform shows transformed description."""
         page.goto(f"file://{transform_report_path}")
 
-        # Expand Apple Purchases merchant
-        apple_row = page.get_by_test_id("merchant-row-Apple Purchases")
-        apple_row.click()
+        # Wait for Vue to mount and render merchant rows
+        apple_row = page.get_by_test_id("merchant-row-Apple_Purchases")
+        expect(apple_row).to_be_visible()
 
-        # Wait for expansion
-        page.wait_for_timeout(200)
+        # Expand Apple Purchases merchant by clicking the chevron
+        apple_row.locator(".chevron").click()
 
         # The transformed description should show "App Store Purchase"
-        txn_row = page.locator(".transaction-row", has_text="App Store Purchase")
+        txn_row = page.locator(".txn-row", has_text="App Store Purchase")
         expect(txn_row).to_be_visible()
 
     def test_extra_fields_badge_includes_original_description(self, page: Page, transform_report_path):
         """The +N badge count includes original_description."""
         page.goto(f"file://{transform_report_path}")
 
-        # Expand Apple Purchases merchant
-        apple_row = page.get_by_test_id("merchant-row-Apple Purchases")
-        apple_row.click()
+        # Wait for Vue to mount and render merchant rows
+        apple_row = page.get_by_test_id("merchant-row-Apple_Purchases")
+        expect(apple_row).to_be_visible()
 
-        page.wait_for_timeout(200)
+        # Expand Apple Purchases merchant by clicking the chevron
+        apple_row.locator(".chevron").click()
 
         # Find the transaction row with extra fields badge
-        txn_row = page.locator(".transaction-row", has_text="App Store Purchase")
+        txn_row = page.locator(".txn-row", has_text="App Store Purchase")
+        expect(txn_row).to_be_visible()
 
         # Should have +2 badge (original_description + store field)
         badge = txn_row.locator(".extra-fields-trigger")
@@ -2086,21 +2088,22 @@ class TestTransformDirective:
         """Clicking +N badge shows original description in popup."""
         page.goto(f"file://{transform_report_path}")
 
-        # Expand Apple Purchases merchant
-        apple_row = page.get_by_test_id("merchant-row-Apple Purchases")
-        apple_row.click()
+        # Wait for Vue to mount and render merchant rows
+        apple_row = page.get_by_test_id("merchant-row-Apple_Purchases")
+        expect(apple_row).to_be_visible()
 
-        page.wait_for_timeout(200)
+        # Expand Apple Purchases merchant by clicking the chevron
+        apple_row.locator(".chevron").click()
 
         # Click the extra fields badge
-        txn_row = page.locator(".transaction-row", has_text="App Store Purchase")
+        txn_row = page.locator(".txn-row", has_text="App Store Purchase")
+        expect(txn_row).to_be_visible()
+
         badge = txn_row.locator(".extra-fields-trigger")
         badge.click()
 
-        page.wait_for_timeout(100)
-
         # Popup should show "Original" label with raw description
-        popup = page.locator(".extra-fields-popup")
+        popup = txn_row.locator(".match-info-popup.visible")
         expect(popup).to_be_visible()
         expect(popup).to_contain_text("Original")
         expect(popup).to_contain_text("APPLE.COM/BILL")
@@ -2109,13 +2112,16 @@ class TestTransformDirective:
         """Transaction without transform has no original_description in badge."""
         page.goto(f"file://{transform_report_path}")
 
-        # Expand Amazon merchant (no transform directive)
+        # Wait for Vue to mount and render merchant rows
         amazon_row = page.get_by_test_id("merchant-row-Amazon")
-        amazon_row.click()
+        expect(amazon_row).to_be_visible()
 
-        page.wait_for_timeout(200)
+        # Expand Amazon merchant by clicking the chevron
+        amazon_row.locator(".chevron").click()
 
         # Amazon transaction should not have extra fields badge
-        txn_row = page.locator(".transaction-row", has_text="AMAZON")
+        txn_row = page.locator(".txn-row", has_text="AMAZON")
+        expect(txn_row).to_be_visible()
+
         badge = txn_row.locator(".extra-fields-trigger")
         expect(badge).not_to_be_visible()
