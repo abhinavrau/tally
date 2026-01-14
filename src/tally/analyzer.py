@@ -591,6 +591,82 @@ def export_markdown(stats, verbose=0, category_filter=None, merchant_filter=None
     return '\n'.join(lines)
 
 
+def export_csv(stats, category_filter=None, merchant_filter=None):
+    """Export analysis results as CSV (transaction-level).
+
+    Args:
+        stats: Analysis results from analyze_transactions()
+        category_filter: Only include merchants in this category
+        merchant_filter: Only include these merchants (list of names)
+
+    Returns: CSV string with headers
+    """
+    import csv
+    import io
+
+    by_merchant = stats.get('by_merchant', {})
+
+    # Collect all transactions and detect extra_fields columns
+    all_transactions = []
+    extra_field_names = set()
+
+    for merchant_name, data in by_merchant.items():
+        # Apply filters
+        if category_filter and data.get('category') != category_filter:
+            continue
+        if merchant_filter and merchant_name not in merchant_filter:
+            continue
+
+        category = data.get('category', '')
+        subcategory = data.get('subcategory', '')
+
+        for txn in data.get('transactions', []):
+            # Construct full date from month (YYYY-MM) and date (MM/DD)
+            month = txn.get('month', '')  # e.g., "2025-01"
+            date_str = txn.get('date', '')  # e.g., "01/15"
+            if month and date_str:
+                # Extract day from MM/DD format
+                day = date_str.split('/')[1] if '/' in date_str else '01'
+                full_date = f"{month}-{day}"  # YYYY-MM-DD
+            else:
+                full_date = date_str
+
+            row = {
+                'date': full_date,
+                'description': txn.get('description', ''),
+                'amount': txn.get('amount', 0),
+                'merchant': merchant_name,
+                'category': category,
+                'subcategory': subcategory,
+                'source': txn.get('source', ''),
+                'tags': ';'.join(sorted(txn.get('tags', []))),
+            }
+
+            # Collect extra_fields
+            if txn.get('extra_fields'):
+                for field_name, field_value in txn['extra_fields'].items():
+                    extra_field_names.add(field_name)
+                    row[field_name] = field_value
+
+            all_transactions.append(row)
+
+    # Sort transactions by date
+    all_transactions.sort(key=lambda x: x['date'])
+
+    # Build header: fixed columns + dynamic extra_fields
+    base_columns = ['date', 'description', 'amount', 'merchant', 'category', 'subcategory', 'source', 'tags']
+    extra_columns = sorted(extra_field_names)
+    all_columns = base_columns + extra_columns
+
+    # Write CSV
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=all_columns, extrasaction='ignore')
+    writer.writeheader()
+    writer.writerows(all_transactions)
+
+    return output.getvalue()
+
+
 def print_summary(stats, title=None, filter_category=None, currency_format="${amount}", group_by='merchant'):
     """Print analysis summary.
 

@@ -6,7 +6,7 @@ import tempfile
 import os
 from datetime import date
 
-from tally.analyzer import parse_amount, parse_generic_csv, analyze_transactions, export_json
+from tally.analyzer import parse_amount, parse_generic_csv, analyze_transactions, export_json, export_csv
 from tally.format_parser import parse_format_string
 from tally.merchant_utils import get_all_rules
 
@@ -60,6 +60,165 @@ class TestExportJson:
         assert 'total' in parsed['by_month']['2025-01']
         assert parsed['by_month']['2025-01']['total'] == 55.0
         assert parsed['by_month']['2025-02']['total'] == 25.0
+
+
+class TestExportCsv:
+    """Tests for export_csv function."""
+
+    def _create_transactions(self, txn_data):
+        """Create test transaction dicts."""
+        transactions = []
+        for i, (merchant, amount, category, tags, txn_date) in enumerate(txn_data):
+            transactions.append({
+                'date': txn_date,
+                'description': merchant,
+                'raw_description': merchant,
+                'merchant': merchant,
+                'amount': amount,
+                'category': category,
+                'subcategory': 'General',
+                'source': 'test.csv',
+                'match_info': {'tags': tags} if tags else None,
+                'tags': tags or [],
+                'excluded': None,
+            })
+        return transactions
+
+    def test_export_csv_basic(self):
+        """export_csv should produce valid CSV with all columns."""
+        txns = self._create_transactions([
+            ('GROCERY STORE', 50.00, 'Food', ['groceries'], date(2025, 1, 15)),
+            ('COFFEE SHOP', 5.00, 'Food', [], date(2025, 1, 16)),
+        ])
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats)
+
+        # Parse CSV
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Verify headers
+        assert 'date' in reader.fieldnames
+        assert 'description' in reader.fieldnames
+        assert 'amount' in reader.fieldnames
+        assert 'merchant' in reader.fieldnames
+        assert 'category' in reader.fieldnames
+        assert 'subcategory' in reader.fieldnames
+        assert 'source' in reader.fieldnames
+        assert 'tags' in reader.fieldnames
+
+        # Verify we have 2 rows
+        assert len(rows) == 2
+
+    def test_export_csv_date_format(self):
+        """export_csv should use YYYY-MM-DD date format for sorting."""
+        txns = self._create_transactions([
+            ('GROCERY STORE', 50.00, 'Food', [], date(2025, 1, 15)),
+            ('COFFEE SHOP', 5.00, 'Food', [], date(2025, 12, 5)),
+        ])
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats)
+
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Check dates are ISO format
+        dates = [r['date'] for r in rows]
+        assert '2025-01-15' in dates
+        assert '2025-12-05' in dates
+
+    def test_export_csv_sorted_by_date(self):
+        """export_csv should sort transactions by date."""
+        txns = self._create_transactions([
+            ('LATE', 50.00, 'Food', [], date(2025, 12, 1)),
+            ('EARLY', 5.00, 'Food', [], date(2025, 1, 1)),
+            ('MIDDLE', 25.00, 'Food', [], date(2025, 6, 15)),
+        ])
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats)
+
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Verify chronological order
+        assert rows[0]['date'] == '2025-01-01'
+        assert rows[1]['date'] == '2025-06-15'
+        assert rows[2]['date'] == '2025-12-01'
+
+    def test_export_csv_tags_semicolon_separated(self):
+        """export_csv should use semicolons to separate tags."""
+        txns = self._create_transactions([
+            ('STORE', 50.00, 'Shopping', ['business', 'reimbursable'], date(2025, 1, 15)),
+        ])
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats)
+
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Tags should be semicolon-separated and sorted
+        assert rows[0]['tags'] == 'business;reimbursable'
+
+    def test_export_csv_category_filter(self):
+        """export_csv should respect category_filter."""
+        txns = self._create_transactions([
+            ('GROCERY', 50.00, 'Food', [], date(2025, 1, 15)),
+            ('AMAZON', 100.00, 'Shopping', [], date(2025, 1, 16)),
+        ])
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats, category_filter='Food')
+
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Only Food category
+        assert len(rows) == 1
+        assert rows[0]['category'] == 'Food'
+
+    def test_export_csv_extra_fields(self):
+        """export_csv should include extra_fields as additional columns."""
+        txns = [{
+            'date': date(2025, 1, 15),
+            'description': 'PAYPAL PAYMENT',
+            'raw_description': 'PAYPAL PAYMENT',
+            'merchant': 'PayPal',
+            'amount': 50.00,
+            'category': 'Shopping',
+            'subcategory': 'Online',
+            'source': 'test.csv',
+            'tags': [],
+            'excluded': None,
+            'extra_fields': {'paypal_merchant': 'Acme Corp', 'paypal_txn_id': '123ABC'},
+        }]
+
+        stats = analyze_transactions(txns)
+        csv_output = export_csv(stats)
+
+        import csv
+        import io
+        reader = csv.DictReader(io.StringIO(csv_output))
+        rows = list(reader)
+
+        # Extra fields should be columns
+        assert 'paypal_merchant' in reader.fieldnames
+        assert 'paypal_txn_id' in reader.fieldnames
+        assert rows[0]['paypal_merchant'] == 'Acme Corp'
+        assert rows[0]['paypal_txn_id'] == '123ABC'
 
 
 class TestParseAmount:
@@ -589,6 +748,50 @@ class TestCustomCaptures:
             parse_format_string('{date},{type},{merchant},{amount}')
 
         assert 'require a description template' in str(exc_info.value)
+
+    def test_supplemental_source_only_requires_date(self):
+        """Supplemental sources only require {date}, not {amount} or {description}."""
+        # This should NOT raise - supplemental sources don't need amount
+        format_spec = parse_format_string(
+            '{order_id},{item},{price},{date}',
+            description_template='{item}',
+            supplemental=True
+        )
+
+        assert format_spec.date_column == 3
+        assert format_spec.amount_column is None  # No amount required
+        assert format_spec.custom_captures == {'order_id': 0, 'item': 1, 'price': 2}
+
+    def test_supplemental_source_without_amount_fails_for_regular(self):
+        """Regular (non-supplemental) sources still require {amount}."""
+        with pytest.raises(ValueError) as exc_info:
+            parse_format_string(
+                '{order_id},{item},{price},{date}',
+                description_template='{item}',
+                supplemental=False  # Regular source
+            )
+
+        assert 'Missing required fields' in str(exc_info.value)
+        assert 'amount' in str(exc_info.value)
+
+    def test_supplemental_source_with_custom_fields(self):
+        """Supplemental sources can have arbitrary custom fields."""
+        format_spec = parse_format_string(
+            '{date},{order_id},{title},{publisher},{price},{subscription_info}',
+            description_template='{title} - {publisher}',
+            supplemental=True
+        )
+
+        assert format_spec.date_column == 0
+        assert format_spec.amount_column is None
+        assert format_spec.custom_captures == {
+            'order_id': 1,
+            'title': 2,
+            'publisher': 3,
+            'price': 4,
+            'subscription_info': 5
+        }
+        assert format_spec.description_template == '{title} - {publisher}'
 
     def test_template_references_missing_capture(self):
         """Template referencing non-captured field raises error."""

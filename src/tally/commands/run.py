@@ -25,6 +25,7 @@ from ..analyzer import (
     print_sections_summary,
     write_summary_file_vue,
     export_json,
+    export_csv,
     compare_reports,
     has_changes,
     format_diff_summary,
@@ -70,7 +71,7 @@ def cmd_run(args):
 
     # Auto-enable quiet mode for machine-readable formats
     output_format = getattr(args, 'format', 'html')
-    if output_format in ('json', 'markdown'):
+    if output_format in ('json', 'csv', 'markdown'):
         args.quiet = True
 
     if not args.quiet:
@@ -200,6 +201,9 @@ def cmd_run(args):
     if output_format == 'json':
         # JSON output with reasoning
         print(export_json(stats, verbose=verbose, category_filter=category_filter))
+    elif output_format == 'csv':
+        # CSV output (transaction-level)
+        print(export_csv(stats, category_filter=category_filter))
     elif output_format == 'markdown':
         # Markdown output with reasoning
         from ..analyzer import export_markdown

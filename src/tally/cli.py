@@ -76,9 +76,9 @@ def main():
     )
     up_parser.add_argument(
         '--format', '-f',
-        choices=['html', 'json', 'markdown', 'summary'],
+        choices=['html', 'json', 'csv', 'markdown', 'summary'],
         default='html',
-        help='Output format: html (default), json (with reasoning), markdown, summary (text)'
+        help='Output format: html (default), json (with reasoning), csv (transactions), markdown, summary (text)'
     )
     up_parser.add_argument(
         '-v', '--verbose',
@@ -155,9 +155,9 @@ def main():
     )
     run_parser.add_argument(
         '--format', '-f',
-        choices=['html', 'json', 'markdown', 'summary'],
+        choices=['html', 'json', 'csv', 'markdown', 'summary'],
         default='html',
-        help='Output format: html (default), json (with reasoning), markdown, summary (text)'
+        help='Output format: html (default), json (with reasoning), csv (transactions), markdown, summary (text)'
     )
     run_parser.add_argument(
         '-v', '--verbose',
