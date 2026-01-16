@@ -28,30 +28,30 @@ class TestSkippedRowTracking:
 01/15/24,COFFEE SHOP,-5.00
 01/16/24,GROCERY,-50.00
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                # Use wrong date format (%Y expects 4-digit year, but data has 2-digit)
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            # Use wrong date format (%Y expects 4-digit year, but data has 2-digit)
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert isinstance(result, ParseResult)
-                assert len(result.transactions) == 0
-                assert len(result.skipped_rows) == 2
+            assert isinstance(result, ParseResult)
+            assert len(result.transactions) == 0
+            assert len(result.skipped_rows) == 2
 
-                # Check first skipped row
-                skip = result.skipped_rows[0]
-                assert skip.filepath == f.name
-                assert skip.line_number == 2  # Line 1 is header
-                assert skip.reason == 'date_parse_error'
-                assert '01/15/24' in skip.message
-                assert '%m/%d/%Y' in skip.message
-            finally:
-                os.unlink(f.name)
+            # Check first skipped row
+            skip = result.skipped_rows[0]
+            assert skip.filepath == f.name
+            assert skip.line_number == 2  # Line 1 is header
+            assert skip.reason == 'date_parse_error'
+            assert '01/15/24' in skip.message
+            assert '%m/%d/%Y' in skip.message
+        finally:
+            os.unlink(f.name)
 
     def test_empty_fields_tracked(self):
         """Rows with empty required fields should be tracked."""
@@ -61,30 +61,30 @@ class TestSkippedRowTracking:
 ,GROCERY,-25.00
 01/18/2025,GAS STATION,
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert len(result.transactions) == 1  # Only first row is valid
-                assert len(result.skipped_rows) == 3
+            assert len(result.transactions) == 1  # Only first row is valid
+            assert len(result.skipped_rows) == 3
 
-                # Check reasons
-                reasons = [s.reason for s in result.skipped_rows]
-                assert reasons.count('empty_required_field') == 3
+            # Check reasons
+            reasons = [s.reason for s in result.skipped_rows]
+            assert reasons.count('empty_required_field') == 3
 
-                # Check specific messages
-                messages = [s.message for s in result.skipped_rows]
-                assert any('description' in m for m in messages)
-                assert any('date' in m for m in messages)
-                assert any('amount' in m for m in messages)
-            finally:
-                os.unlink(f.name)
+            # Check specific messages
+            messages = [s.message for s in result.skipped_rows]
+            assert any('description' in m for m in messages)
+            assert any('date' in m for m in messages)
+            assert any('amount' in m for m in messages)
+        finally:
+            os.unlink(f.name)
 
     def test_insufficient_columns_tracked(self):
         """Rows with too few columns should be tracked."""
@@ -93,25 +93,25 @@ class TestSkippedRowTracking:
 01/16/2025,GROCERY
 01/17/2025
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert len(result.transactions) == 1
-                assert len(result.skipped_rows) == 2
+            assert len(result.transactions) == 1
+            assert len(result.skipped_rows) == 2
 
-                # Both should be insufficient columns
-                for skip in result.skipped_rows:
-                    assert skip.reason == 'insufficient_columns'
-                    assert 'column' in skip.message.lower()
-            finally:
-                os.unlink(f.name)
+            # Both should be insufficient columns
+            for skip in result.skipped_rows:
+                assert skip.reason == 'insufficient_columns'
+                assert 'column' in skip.message.lower()
+        finally:
+            os.unlink(f.name)
 
     def test_zero_amount_tracked(self):
         """Rows with zero amount should be tracked."""
@@ -120,23 +120,23 @@ class TestSkippedRowTracking:
 01/16/2025,ZERO TRANSACTION,0.00
 01/17/2025,ANOTHER ZERO,0
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert len(result.transactions) == 1
-                assert len(result.skipped_rows) == 2
+            assert len(result.transactions) == 1
+            assert len(result.skipped_rows) == 2
 
-                for skip in result.skipped_rows:
-                    assert skip.reason == 'zero_amount'
-            finally:
-                os.unlink(f.name)
+            for skip in result.skipped_rows:
+                assert skip.reason == 'zero_amount'
+        finally:
+            os.unlink(f.name)
 
     def test_successful_parse_no_skipped_rows(self):
         """Successful parse should have empty skipped_rows."""
@@ -144,42 +144,42 @@ class TestSkippedRowTracking:
 01/15/2025,COFFEE SHOP,-5.00
 01/16/2025,GROCERY,-50.00
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert len(result.transactions) == 2
-                assert len(result.skipped_rows) == 0
-            finally:
-                os.unlink(f.name)
+            assert len(result.transactions) == 2
+            assert len(result.skipped_rows) == 0
+        finally:
+            os.unlink(f.name)
 
     def test_skipped_row_has_raw_data(self):
         """SkippedRow should include raw line data for debugging."""
         csv_content = """Date,Description,Amount
 BAD_DATE,COFFEE SHOP,-5.00
 """
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        f = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
+        try:
             f.write(csv_content)
-            f.flush()
+            f.close()  # Close before parsing (required on Windows)
 
-            try:
-                format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
-                rules = get_all_rules()
+            format_spec = parse_format_string("{date:%m/%d/%Y},{description},{amount}")
+            rules = get_all_rules()
 
-                result = _parse_generic_csv(f.name, format_spec, rules)
+            result = _parse_generic_csv(f.name, format_spec, rules)
 
-                assert len(result.skipped_rows) == 1
-                skip = result.skipped_rows[0]
-                assert skip.raw_data is not None
-                assert 'BAD_DATE' in skip.raw_data
-            finally:
-                os.unlink(f.name)
+            assert len(result.skipped_rows) == 1
+            skip = result.skipped_rows[0]
+            assert skip.raw_data is not None
+            assert 'BAD_DATE' in skip.raw_data
+        finally:
+            os.unlink(f.name)
 
 
 class TestDateFormatDetection:
