@@ -112,6 +112,13 @@ jobs:
               echo "---"
               echo ""
             fi
+            echo "### Update"
+            echo ""
+            echo "Already have tally installed? Just run:"
+            echo '```bash'
+            echo "tally update"
+            echo '```'
+            echo ""
             echo "### Install"
             echo ""
             echo "**Linux / macOS:**"
